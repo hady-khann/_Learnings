@@ -10,28 +10,27 @@ sudo cp -a /etc/chrony/chrony.conf \
     /etc/chrony/chrony.conf.bak.$(date +%Y%m%d-%H%M%S)
 
 sudo tee /etc/chrony/chrony.conf > /dev/null <<'EOF'
-# ============================================================
-# Ceph node - INTERNAL CHRONY / NTP CLIENT
-# ============================================================
-
-# ceph-node1 is the internal NTP server.
 server ceph-node1 iburst prefer
-
-# Clock drift.
 driftfile /var/lib/chrony/chrony.drift
-
-# Correct large initial offsets.
 makestep 1.0 3
-
-# Synchronize hardware RTC with system clock.
 rtcsync
-
-# Logging.
 logdir /var/log/chrony
 EOF
 
-echo "===== CHECK CHRONY CONFIG ====="
+echo "===== CHRONY CONFIG ====="
+sudo cat /etc/chrony/chrony.conf
+
+echo
+echo "===== VALIDATE CONFIG ====="
 sudo chronyd -p /etc/chrony/chrony.conf
+
+echo
+echo "===== RESOLVE NODE1 ====="
+getent hosts ceph-node1
+
+echo
+echo "===== PING NODE1 ====="
+ping -c 3 ceph-node1
 
 echo
 echo "===== ENABLE CHRONY ====="
@@ -41,28 +40,20 @@ echo
 echo "===== RESTART CHRONY ====="
 sudo systemctl restart chrony
 
-sleep 5
+sleep 10
 
 echo
-echo "============================================================"
-echo " TIME"
-echo "============================================================"
+echo "===== TIME ====="
 timedatectl
 
 echo
-echo "============================================================"
-echo " CHRONY SERVICE"
-echo "============================================================"
+echo "===== CHRONY SERVICE ====="
 sudo systemctl status chrony --no-pager -l
 
 echo
-echo "============================================================"
-echo " CHRONY SOURCES"
-echo "============================================================"
+echo "===== CHRONY SOURCES ====="
 chronyc sources -v
 
 echo
-echo "============================================================"
-echo " CHRONY TRACKING"
-echo "============================================================"
+echo "===== CHRONY TRACKING ====="
 chronyc tracking
