@@ -1,0 +1,183 @@
+---
+# =============================================================================
+# community.general.ceph_pool - Field Reference
+# =============================================================================
+# For the authoritative, version-matched documentation on the node itself,
+# always run:
+#   ansible-doc community.general.ceph_pool
+#
+# Fields
+# -----------------------------------------------------------------------------
+# name (required)
+#   Name of the pool. Example: mypool
+#
+# state
+#   present  -> creates the pool if it doesn't exist (default)
+#   absent   -> deletes the pool (caution: this destroys data)
+#   list     -> only lists existing pools, makes no changes
+#
+# pool_type
+#   replicated  -> the default type. Each object is stored as multiple full
+#                  copies (replicas) across different OSDs. Suitable for
+#                  most use cases (RBD, general CephFS).
+#   erasure     -> instead of full replicas, data is split into chunks plus
+#                  parity. Uses less space but has higher processing
+#                  overhead, so it's less recommended for latency-sensitive
+#                  workloads (like interactive RBD) and more suited to
+#                  archival/RGW use cases.
+#
+# size
+#   Replicated pools only. Number of copies of each object (including the
+#   original). Example: size=3 means each piece of data is kept on 3
+#   different OSDs. If omitted, the cluster's osd_pool_default_size is used.
+#
+# min_size
+#   Replicated pools only. The minimum number of healthy copies the pool
+#   needs before it will stop serving I/O. Usually size-1 or lower. If
+#   omitted, Ceph calculates it automatically.
+#
+# erasure_profile
+#   Erasure pools only. The name of a predefined erasure-code profile (or
+#   "default"). The profile determines how many data chunks (k) and parity
+#   chunks (m) are used.
+#
+# rule_name
+#   The name of the CRUSH rule the pool should follow (e.g. for separating
+#   by disk type - HDD/SSD - or rack awareness). If omitted, the default
+#   replicated_rule is used.
+#
+# pg_num
+#   Number of Placement Groups. Directly affects data distribution and
+#   performance. For a small practice cluster (3 nodes), values like 8, 16,
+#   or 32 are sufficient. Rough official Ceph formula:
+#     pg_num = (number_of_OSDs * 100) / size, rounded to the nearest power of 2
+#
+# pgp_num
+#   The number of PGs actually used for placement (distribution
+#   calculation). Should generally equal pg_num; if omitted, it defaults to
+#   the same value as pg_num.
+#
+# pg_autoscale_mode
+#   on    -> Ceph automatically adjusts pg_num based on data volume over
+#            time (default in newer versions, and more convenient for a
+#            practice environment since you don't have to calculate it
+#            yourself)
+#   warn  -> only warns that pg_num is suboptimal, but doesn't change it
+#   off   -> fully manual; the pg_num value you set stays fixed
+#
+# target_size_ratio
+#   A hint to the PG autoscaler about how big this pool is EXPECTED to
+#   become, relative to the whole cluster's usable capacity. Only used
+#   when pg_autoscale_mode is "on".
+#
+#   Example: target_size_ratio: 0.2 means "I expect this pool to
+#   eventually use about 20% of total cluster storage."
+#
+#   Why it matters: a brand-new, empty pool gives the autoscaler nothing
+#   to judge its eventual size by, so without a hint it may start with a
+#   tiny pg_num and then have to keep growing it as data comes in
+#   (causing rebalancing overhead each time it changes). This ratio lets
+#   the autoscaler pick a more appropriate pg_num from the start instead
+#   of repeatedly re-adjusting.
+#
+#   It's meant to be set proportionally across all pools in the cluster so
+#   they sum to roughly 1.0 (100% of expected usage). Example for 3 pools:
+#     mypool:       target_size_ratio: 0.5   (expect 50% of cluster)
+#     archive-pool: target_size_ratio: 0.3   (expect 30% of cluster)
+#     logs-pool:    target_size_ratio: 0.1   (expect 10% of cluster)
+#     (remaining ~10% left unaccounted for, which is fine)
+#
+#   It's a hint, not a hard limit - it can be changed anytime, and if
+#   omitted, Ceph still autoscales based on actual usage as the pool
+#   grows, just slightly less optimally at first.
+#
+# application
+#   The application that will use this pool; equivalent to running
+#   `ceph osd pool application enable`. Common values:
+#   rbd     -> block storage / VM disk images
+#   cephfs  -> distributed filesystem (usually set automatically when
+#              creating a CephFS, not manually)
+#   rgw     -> object storage / S3-compatible gateway
+#
+# cluster
+#   The Ceph cluster name, if not using the default "ceph". Not needed for
+#   most environments, including this Vagrant-based cluster.
+# =============================================================================
+#
+# Checking autoscaler status
+# -----------------------------------------------------------------------------
+# To see current pg_num, target_size_ratio, and what the autoscaler is
+# planning/doing for each pool, run on any mon/admin node:
+#
+#   ceph osd pool autoscale-status
+#
+# This prints a table with columns roughly like:
+#   POOL       SIZE  TARGET SIZE  RATE  RAW CAPACITY  RATIO  TARGET RATIO
+#   PG_NUM  NEW PG_NUM  AUTOSCALE
+#
+# Key columns to watch:
+#   SIZE          - current actual size of the pool's data
+#   RATIO         - the pool's current share of raw cluster capacity
+#   TARGET RATIO  - the target_size_ratio value you configured (if any)
+#   PG_NUM        - the pool's current pg_num
+#   NEW PG_NUM    - shown only if the autoscaler wants to change pg_num;
+#                   this is its recommended/pending value
+#   AUTOSCALE     - on / warn / off, matching pg_autoscale_mode
+#
+# If NEW PG_NUM keeps appearing and changing, it usually means either the
+# pool is still filling up with data, or target_size_ratio doesn't match
+# reality closely enough - adjust it and re-check after a few minutes.
+# =============================================================================
+
+- name: Manage Ceph pools
+  hosts: localhost
+  connection: local
+  become: true
+  tasks:
+
+    # ------------------------------------------------------------------
+    # Example 1: simple replicated pool for RBD (the most common case)
+    # ------------------------------------------------------------------
+    - name: Ensure mypool exists
+      community.general.ceph_pool:
+        name: mypool
+        state: present
+        pool_type: replicated
+        pg_num: 32
+        size: 3
+        application: rbd
+
+    # ------------------------------------------------------------------
+    # Example 2 (commented out): same pool but with autoscaler enabled
+    # instead of a manual pg_num - use when you don't want to calculate
+    # pg_num yourself
+    # ------------------------------------------------------------------
+    # - name: Ensure mypool exists (autoscale)
+    #   community.general.ceph_pool:
+    #     name: mypool
+    #     state: present
+    #     pool_type: replicated
+    #     size: 3
+    #     pg_autoscale_mode: "on"
+    #     target_size_ratio: 0.2
+    #     application: rbd
+
+    # ------------------------------------------------------------------
+    # Example 3 (commented out): erasure-coded pool
+    # ------------------------------------------------------------------
+    # - name: Ensure archive-pool exists (erasure)
+    #   community.general.ceph_pool:
+    #     name: archive-pool
+    #     state: present
+    #     pool_type: erasure
+    #     erasure_profile: default
+    #     pg_num: 32
+    #     application: rgw
+
+    # ------------------------------------------------------------------
+    # Example 4 (commented out): removing a pool - caution, destroys data
+    # ------------------------------------------------------------------
+    # - name: Remove old test pool
+    #   community.general.ceph_pool:
+    #     name: old-test-pool
+    #     state: absent
