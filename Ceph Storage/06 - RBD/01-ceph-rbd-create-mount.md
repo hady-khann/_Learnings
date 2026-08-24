@@ -1,159 +1,87 @@
-# Ceph RBD: Pool, Image, Map and Mount
+# ساخت و Mount کردن RBD
 
-## Overview
+این راهنما مراحل ایجاد یک Ceph RBD، ساخت Filesystem و Mount کردن آن روی سیستم را پوشش می‌دهد.
 
-This document shows the basic workflow for creating a Ceph RBD image,
-mapping it to a Linux block device, formatting it, and mounting it.
+## 1. ساخت Pool
 
-``` text
-Ceph Pool
-   │
-   ▼
-RBD Image
-   │
-   ▼
-/dev/rbd0
-   │
-   ▼
-XFS Filesystem
-   │
-   ▼
-/mnt/rbd-mount-app1
-```
-
-## 1. Create the RBD Pool
-
-Create a pool with 50 PGs:
-
-``` bash
+```bash
 ceph osd pool create rbd-pool-app1 50
 ```
 
-Set the replication factor to 3:
+## 2. تعیین Replica = 3
 
-``` bash
+```bash
 ceph osd pool set rbd-pool-app1 size 3
-```
-
-Enable the RBD application on the pool:
-
-``` bash
 ceph osd pool application enable rbd-pool-app1 rbd
 ```
 
-Verify:
+با این تنظیم، هر داده در Pool دارای **۳ Replica** خواهد بود.
 
-``` bash
-ceph osd pool get rbd-pool-app1 size
-ceph osd pool application get rbd-pool-app1
-```
+## 3. ساخت RBD Image با حجم 5GB
 
-> `size 3` means Ceph maintains three replicas of each replicated
-> object. The actual placement is controlled by CRUSH.
-
-## 2. Create the RBD Image
-
-Create a 5 GiB RBD image:
-
-``` bash
+```bash
 rbd create rbd-image-app1 \
   --pool rbd-pool-app1 \
   --size 5G
 ```
 
-Verify:
+## 4. بررسی Image
 
-``` bash
+```bash
 rbd info rbd-pool-app1/rbd-image-app1
 ```
 
-## 3. Map the RBD Image
+## 5. Map کردن RBD به Block Device
 
-Map the image to a Linux block device:
-
-``` bash
+```bash
 rbd map rbd-image-app1 --pool rbd-pool-app1
 ```
 
-Check mapped RBD devices:
+پس از موفقیت، RBD به یک Block Device مانند `/dev/rbd0` متصل می‌شود.
 
-``` bash
+## 6. مشاهده RBDهای Map شده
+
+```bash
 rbd showmapped
 ```
 
-The device may appear as:
+## 7. بررسی Block Device
 
-``` text
-/dev/rbd0
-```
-
-Verify the device:
-
-``` bash
+```bash
 fdisk -l /dev/rbd0
 ```
 
-You can also use:
+## 8. ساخت Filesystem
 
-``` bash
-lsblk
-```
+در این مثال از XFS استفاده می‌کنیم:
 
-## 4. Create a Filesystem
-
-Create an XFS filesystem:
-
-``` bash
+```bash
 mkfs.xfs /dev/rbd0
 ```
 
-> `mkfs.xfs` destroys existing data on the device. Only run it on a new
-> or intentionally empty RBD.
+> **توجه:** اجرای `mkfs` روی Device موجود، اطلاعات قبلی آن را از بین می‌برد. این دستور را فقط روی RBD جدید اجرا کنید.
 
-## 5. Mount the RBD
+## 9. ساخت Mount Point
 
-Create a mount point:
-
-``` bash
+```bash
 mkdir -p /mnt/rbd-mount-app1
 ```
 
-Mount the filesystem:
+## 10. Mount کردن RBD
 
-``` bash
+```bash
 mount /dev/rbd0 /mnt/rbd-mount-app1
 ```
 
-Verify:
+## 11. بررسی
 
-``` bash
+```bash
 df -h /mnt/rbd-mount-app1
 df -Th
 ```
 
-## Final State
+در صورت موفقیت، باید `/dev/rbd0` را به همراه Filesystem نوع `xfs` و Mount Point زیر مشاهده کنید:
 
-``` text
-rbd-pool-app1
-      │
-      └── rbd-image-app1 (5 GiB)
-                │
-                ▼
-             /dev/rbd0
-                │
-                ▼
-              XFS
-                │
-                ▼
-       /mnt/rbd-mount-app1
+```text
+/mnt/rbd-mount-app1
 ```
-
-## Important Notes
-
--   RBD is block storage; XFS is the filesystem placed on top of it.
--   `rbd map` exposes the RBD image as a Linux block device.
--   The pool replication setting and the filesystem are separate
-    concepts.
--   Before using an RBD on another client, make sure the access pattern
-    is safe. A normal XFS filesystem should not be mounted read/write
-    simultaneously by multiple independent hosts.
