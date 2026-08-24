@@ -55,6 +55,7 @@ Example:
 
 ```text
 cephadm version <version>
+
 ceph version <version>
 ```
 
@@ -62,11 +63,46 @@ ceph version <version>
 
 ---
 
-## 3. Bootstrap the Ceph Cluster
+## 3. Create an SSH Key for Ceph Cluster Management
+
+Before bootstrapping and adding additional Ceph nodes, create an SSH key pair on the first Ceph node.
+
+Cephadm uses SSH to connect to and manage the other nodes in the cluster. The SSH key generated here can be provided to `cephadm bootstrap`.
+
+Generate an ED25519 SSH key:
+
+```bash
+ssh-keygen -t ed25519
+```
+
+When prompted for a passphrase, leave it empty by pressing **Enter** twice.
+
+The generated files are:
+
+```text
+~/.ssh/ed25519
+~/.ssh/ed25519.pub
+```
+
+Verify that the key files exist:
+
+```bash
+ls -l ~/.ssh/ed25519*
+```
+
+The public key will later be installed on the other Ceph nodes so that Cephadm can connect to them without requiring a password.
+
+> **Important:** Keep the private key `~/.ssh/ed25519` secure. Never copy or distribute the private key to other Ceph nodes. Only the public key should be installed on remote hosts.
+
+---
+
+## 4. Bootstrap the Ceph Cluster
 
 Bootstrap the cluster from the first Ceph node.
 
 The monitor IP must be the IP address assigned to the first monitor node on the Ceph cluster network.
+
+Use the SSH key created in the previous step:
 
 ```bash
 sudo cephadm bootstrap --mon-ip <your-first-monitor-ip>
@@ -95,3 +131,5 @@ sudo ceph orch host ls
 The initial node should appear as the first host in the cluster.
 
 > **Important:** Use the IP address reachable by the other Ceph nodes. Do not use `127.0.0.1` or a loopback address for `--mon-ip`.
+
+> **Note:** If the SSH key is stored at the default path expected by your Cephadm version, explicitly specifying `--ssh-private-key` may not be necessary. Specifying it explicitly is recommended when using a dedicated Cephadm key such as `~/.ssh/ed25519`.
