@@ -58,6 +58,80 @@ Application      → RBD
 
 ---
 
+## نمونه 2.1 — Replicated Pool با `target_size_bytes`
+
+وقتی حجم دقیق دادهٔ آینده Pool را می‌دانید (نه سهم نسبی آن از کل کلاستر)، به‌جای `target_size_ratio` می‌توانید از `target_size_bytes` استفاده کنید:
+
+```yaml
+- name: Manage Ceph pools
+  hosts: localhost
+  connection: local
+  become: true
+
+  tasks:
+
+    - name: Ensure backup-pool exists with a fixed target size
+      ceph.automation.ceph_pool:
+        name: backup-pool
+        state: present
+        pool_type: replicated
+        size: 3
+        pg_autoscale_mode: on
+        target_size_bytes: 500G
+        application: rbd
+```
+
+در این مثال:
+
+```text
+Pool type        → replicated
+Replica count    → 3
+PG Autoscaler    → on
+Expected size    → 500G
+Application      → RBD
+```
+
+> نکته: `target_size_ratio` و `target_size_bytes` نباید هم‌زمان روی یک Pool تنظیم شوند؛ فقط یکی از این دو پارامتر را در Task قرار دهید.
+
+---
+
+## نمونه 2.2 — Replicated Pool با `bulk`
+
+اگر نه سهم نسبی و نه حجم دقیق Pool را از قبل نمی‌دانید، اما می‌دانید این Pool قرار است حجم قابل‌توجهی داده داشته باشد (مثل یک Pool اصلی RBD یا CephFS)، فعال کردن `bulk` ساده‌ترین گزینه است:
+
+```yaml
+- name: Manage Ceph pools
+  hosts: localhost
+  connection: local
+  become: true
+
+  tasks:
+
+    - name: Ensure mypool exists as a bulk pool
+      ceph.automation.ceph_pool:
+        name: mypool
+        state: present
+        pool_type: replicated
+        size: 3
+        pg_autoscale_mode: on
+        bulk: true
+        application: rbd
+```
+
+در این مثال:
+
+```text
+Pool type        → replicated
+Replica count    → 3
+PG Autoscaler    → on
+Bulk             → true
+Application      → RBD
+```
+
+با `bulk: true`، Autoscaler از همان ابتدا فرض می‌کند Pool قرار است داده زیادی داشته باشد و تعداد PG کامل‌تری تخصیص می‌دهد؛ بدون نیاز به تعیین `target_size_ratio` یا `target_size_bytes`.
+
+---
+
 ## نمونه 3 — Erasure-Coded Pool
 
 برای Workloadهایی که Erasure Coding برای آن‌ها مناسب است:
@@ -159,6 +233,8 @@ ansible-galaxy collection list | grep -i ceph
 ```bash
 ansible-doc ceph.automation.ceph_pool
 ```
+
+> نکته: پارامترهایی مانند `target_size_bytes` و `bulk` ممکن است بسته به نسخه‌ی `ceph.automation` Collection نصب‌شده، پشتیبانی نشوند یا نام متفاوتی داشته باشند. حتماً قبل از استفاده، خروجی `ansible-doc` را برای نسخه نصب‌شده بررسی کنید.
 
 و وضعیت Cluster را بررسی کنید:
 
