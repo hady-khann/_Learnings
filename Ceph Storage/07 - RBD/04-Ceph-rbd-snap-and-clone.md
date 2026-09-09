@@ -70,9 +70,7 @@ Clone به‌صورت Copy-on-Write به snapshot والد وابسته است. 
 rbd flatten rbd-pool-app1/rbd-image-app1-clone20260825
 ```
 
----
-
-## بعد از flatten:
+بعد از flatten:
 
 - clone دیگر parent ندارد و به‌تنهایی کامل است
 - از لیست childrenِ snapshot حذف می‌شود
