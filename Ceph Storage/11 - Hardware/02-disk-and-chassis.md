@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # دیسک، نسبت SSD به OSD، و شاسی
 
 ادامهٔ همان اسلایدهای جلسهٔ هشتم: نوع دیسک journal/WAL، نسبت فلش به HDD، و مثال شاسی SuperMicro / HPE.
@@ -47,3 +49,4 @@ OSD Nodes:       12× / 36× / 72×  3.5" HDD bays
 استاد صفحهٔ پیکربندی HPE ProLiant DL380 Gen10 را باز کرد (ترکیب NVMe + SAS/SATA). چت کلاس پرسید NVMe روی DL20 Gen10 و M.2. این بخش کاتالوگ است، نه نصب لاب.
 
 برای ادامهٔ نرم‌افزار (`mds cache size`، `osd_journal_size`، jumbo frame) جلسهٔ نهم را ببینید؛ آن یادداشت جدا نوشته می‌شود.
+</div>

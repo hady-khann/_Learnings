@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # نصب RGW با ceph-ansible و تست Swift
 
 نود `rgw-node1` (`192.168.1.11`) را به Inventory اضافه کنید، Playbook را دوباره اجرا کنید، کاربر Object بسازید، و از `client-node1` با CLI `swift` یک bucket بسازید.
@@ -147,3 +149,4 @@ S3 با `s3cmd` در چت کلاس مطرح شد ولی در این جلسه CLI
 ## ۵. فضای مصرف‌شده بعد از RGW
 
 `ceph df` بعد از بالا آمدن Gateway Poolهای جدید را نشان می‌دهد؛ مثلاً `default.rgw.log` چند مگابایت log دارد حتی قبل از بار واقعی. Filesystem CephFS هم در همان خروجی هست (`cephfs_data` / `cephfs_metadata`) — RGW آن‌ها را جایگزین نمی‌کند.
+</div>

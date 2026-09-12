@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # ساخت و Mount کردن RBD
 
 این راهنما مراحل ایجاد یک Ceph RBD، ساخت Filesystem و Mount کردن آن روی سیستم را پوشش می‌دهد.
@@ -85,3 +87,4 @@ df -Th
 ```text
 /mnt/rbd-mount-app1
 ```
+</div>

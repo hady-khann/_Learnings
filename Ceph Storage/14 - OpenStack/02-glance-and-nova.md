@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Glance روی RBD و تلاش برای `nova boot`
 
 بعد از keyring و secret، روی `controller` بک‌اند Glance را به Pool `images` وصل کردند، یک image به نام `anisa` ساختند، و با CLI قدیمی `nova` یک VM زدند. Cinder volume در این جلسه تا ته لاب نشد.
@@ -176,3 +178,4 @@ error: unrecognized arguments: --network internal_network
 ## ۷. ephemeral در برابر volume
 
 در چت: اگر فقط Nova باشد و Cinder نباشد، دیسک VM از نظر کاربر ephemeral است و با حذف اینستنس می‌رود. برای دیسک ماندگار باید Cinder به Pool `volumes` وصل شود (secret و `client.cinder` همین جلسه‌اند؛ کانفیگ `cinder.conf` روی صفحه کامل دیده نشد).
+</div>

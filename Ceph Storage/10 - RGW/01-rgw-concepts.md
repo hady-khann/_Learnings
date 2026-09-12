@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # RADOS Gateway: Object Storage با S3 و Swift
 
 نیمهٔ دوم جلسهٔ ششم Object Storage است: **RGW** (`radosgw`) یک HTTP API روی RADOS می‌گذارد تا کلاینت‌ها با پروتکل **S3** (آمازون) یا **Swift** (OpenStack) کار کنند.
@@ -95,3 +97,4 @@ rgw s3 auth use keystone = true
 ## نظارت
 
 انتهای جلسه مانیتورینگ جدا از RGW بود (Grafana، Prometheus، Zabbix در چت). خود RGW را از `ceph -s` و Poolهای `.rgw.*` دنبال کنید.
+</div>

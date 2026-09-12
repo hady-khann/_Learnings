@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # تنظیم نرم‌افزار: cache، فایل‌های باز، و PG
 
 جلسهٔ آنلاین نهم (Iran Linux House، ۲۷ نوامبر ۲۰۲۲) با اسلایدهای **Software tuning** شروع می‌شود. اول روی `ceph-node1` پوشهٔ `~/ceph-ansible/group_vars` را باز کردند (`ceph_stable_release: pacific` در `all.yml.sample`)؛ آن بخش مرور نصب است و در `02 - Install` مانده. اینجا فقط پارامترهای اسلاید ۵۲ تا ۵۴ را نگه دارید.
@@ -81,3 +83,4 @@ osd pool default pg num = 128
 ```
 
 در همین جلسه روی کلاستر hoodadcloud ساخت Pool با `pg_num 128` برای `vms` به سقف `mon_max_pg_per_osd` خورد؛ جزئیات در `14 - OpenStack`. فرمول اسلاید تخمین دوره است؛ autoscaler در `06 - Pool` است.
+</div>

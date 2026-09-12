@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Poolهای OpenStack، کاربر CephX، و secret در libvirt
 
 نیمهٔ عملی جلسهٔ نهم روی کلاستر **hoodadcloud** است، نه VMهای آموزشی `192.168.1.x`. Horizon روی `hoodadcloud.ir` است. نودها:
@@ -214,3 +216,4 @@ scp ceph.client.cinder.keyring ceph.client.glance.keyring compute:/etc/ceph/
 یک‌بار مقصد را `ssh compute` نوشتند و `ssh: No such file or directory` گرفتند. روی خود compute اول فقط `rbdmap` در `/etc/ceph` بود.
 
 > **هشدار:** UUID داخل `secret.xml` روی controller (`82b2ce11-…`) با secret واقعی compute (`19deff5b-…`) فرق داشت. اگر Nova هنوز UUID اول را در `nova.conf` / `cinder.conf` دارد، attach دیسک RBD شکست می‌خورد.
+</div>

@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Application و Cluster
 
 ## `application`
@@ -105,3 +107,4 @@ cluster: ceph
 ```
 
 > نوع Application باید با نحوه استفاده واقعی از Pool مطابقت داشته باشد. صرفاً اضافه‌کردن `rbd` یا `rgw` بدون اینکه Pool واقعاً توسط آن سرویس استفاده شود، طراحی مناسبی نیست.
+</div>

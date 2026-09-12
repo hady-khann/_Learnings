@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # مرجع فیلدهای `ceph.automation.ceph_pool`
 
 > **مرجع اصلی:** برای مشاهده مستندات دقیق و متناسب با نسخه نصب‌شده روی همان Node، همیشه ابتدا اجرا کنید:
@@ -254,3 +256,4 @@ CRUSH Rule تعیین می‌کند داده چگونه روی Storage hierarchy
 | `rule_name`       | CRUSH Rule                               |
 
 برای ادامه فیلدها، به فایل‌های مربوط به PG، Autoscaler و Application مراجعه کنید.
+</div>

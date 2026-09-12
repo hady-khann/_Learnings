@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Monitor، journal، و Jumbo Frame
 
 ادامهٔ اسلایدهای جلسهٔ نهم: کی OSD را down/out کنید، اندازهٔ journal (دورهٔ FileStore)، و MTU ۹۰۰۰.
@@ -44,3 +46,4 @@ ifconfig eth0 mtu 9000
 در چت `fragment` و `blk` و message queue هم مطرح شد؛ اسلاید فقط MTU را می‌گوید. توپولوژی دو سوئیچ Client و دو سوئیچ Cluster در `11 - Hardware` است.
 
 این دستور پایدار نیست؛ برای reboot باید در netplan/NetworkManager یا کانفیگ سوئیچ هم MTU ۹۰۰۰ بماند.
+</div>

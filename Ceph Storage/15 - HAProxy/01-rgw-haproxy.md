@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # HAProxy جلوی چند RGW
 
 آخر جلسهٔ نهم روی همان `ceph-1` (hoodadcloud، شبکهٔ `185.55.227.x`) فایل `/etc/haproxy/haproxy.cfg` را برای load-balance دو `radosgw` ویرایش کردند. این لاب جدا از Glance است؛ مفهوم RGW در `10 - RGW` است.
@@ -78,3 +80,4 @@ The unit haproxy.service has entered the 'failed' state with result 'exit-code'.
 `iptables -L` زنجیره‌های DOCKER را نشان داد (cephadm روی همین میزبان container دارد). اگر پورت ۸۰۸۰ را خود RGW یا چیز دیگری bind کرده باشد، HAProxy بالا نمی‌آید.
 
 > **هشدار:** لاب این جلسه با HAProxy سالم تمام نشد. قبل از `systemctl start haproxy` با `ss -lntp | grep 8080` ببینید پورت آزاد است، بعد `haproxy -c -f /etc/haproxy/haproxy.cfg` را برای syntax بزنید.
+</div>

@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Ceph RBD — Image, Snapshot & Clone Workflow
 
 مراحل ساخت یک RBD image پایه، گرفتن snapshot، محافظت از آن، ساخت clone از رویش، و unlink کردن clone با flatten.
@@ -123,3 +125,4 @@ rbd snap rm \
 - Unlink کلون از والد با `rbd flatten` انجام می‌شود؛ دستور جداگانه‌ای به نام `rbd unlink` وجود ندارد.
 - `flatten` حجم و زمان می‌برد چون objectهای مشترک parent را داخل clone کپی می‌کند.
 - برای حذف snapshot محافظت‌شده: اول flatten/حذف همه‌ی cloneها، بعد `rbd snap unprotect`، سپس `rbd snap rm`. با `rbd children` خالی بودن لیست را چک کنید.
+</div>

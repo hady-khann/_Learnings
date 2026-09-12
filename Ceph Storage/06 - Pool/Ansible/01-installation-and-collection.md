@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # نصب و شناسایی Collection مربوط به Ceph Pool
 
 ## نکته مهم
@@ -153,3 +155,4 @@ ceph.automation.ceph_pool:
 ```
 
 استفاده کنید.
+</div>

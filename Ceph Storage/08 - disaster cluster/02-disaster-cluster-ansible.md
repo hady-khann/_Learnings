@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # ساخت کلاستر Disaster با ceph-ansible
 
 کلاستر Passive روی نودهای `ceph-node5` تا `ceph-node7` با همان `ceph-ansible` کلاستر اصلی ساخته می‌شود؛ فقط Inventory و نام Cluster فرق دارد.
@@ -131,3 +133,4 @@ ssh-copy-id root@ceph-node1
 ## نکتهٔ CEPH_ARGS در bashrc
 
 اگر نام Cluster همیشه `backup` است، می‌توان `export CEPH_ARGS="--cluster backup"` را در `~/.bashrc` گذاشت تا هر بار `ceph -s` بدون فلگ کار کند.
+</div>

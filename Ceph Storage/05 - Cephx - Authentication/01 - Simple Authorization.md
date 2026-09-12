@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 
 # احراز هویت و مدیریت دسترسی در Ceph — CephX
 
@@ -548,3 +550,4 @@ Authorization
   ↓
 Allowed Operations
 ```
+</div>

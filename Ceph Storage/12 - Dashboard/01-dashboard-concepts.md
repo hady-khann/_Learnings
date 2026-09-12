@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Ceph Dashboard و Grafana
 
 نیمهٔ دوم جلسهٔ هشتم Dashboard را روی همان کلاستر لاب (`ceph-node1` = `192.168.1.15`) بالا می‌آورد. Grafana/Prometheus از قبل به‌صورت Container روی نود بودند؛ مشکل اصلی این بود که پورت ۸۴۴۳ جواب نمی‌داد تا پکیج `ceph-mgr-dashboard` و نسخهٔ Pacific درست شود.
@@ -50,3 +52,4 @@ http://192.168.1.15:3000
 داشبورد `ceph-dashboard / Host Overview` در لاب این ارقام را نشان داد: ۳ OSD Host، CPU حدود ۵.۶٪، RAM حدود ۳۸٪، IOPS حدود ۱۴۲.
 
 > **هشدار:** خودِ Ceph Dashboard (ماژول MGR روی ۸۴۴۳) با Grafana یکی نیست. Grafana متریک را می‌کشد؛ Dashboard مدیریت کلاستر است و باید API Grafana/Prometheus را جدا به آن بدهید.
+</div>

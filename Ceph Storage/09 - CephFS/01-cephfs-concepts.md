@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # CephFS: فایل‌سیستم توزیع‌شده روی کلاستر
 
 جلسهٔ آنلاین ششم (Iran Linux House، ۱۵ نوامبر ۲۰۲۲) با **CephFS** شروع می‌شود: یک POSIX filesystem روی همان RADOS که RBD از آن استفاده می‌کند.
@@ -78,3 +80,4 @@ cephfs_metadata
 ```
 
 RAW STORAGE حدود `180 GiB` با ۹ OSD. خود Filesystem از قبل روی کلاستر ساخته شده بود؛ کار جلسه ساخت کاربر و mount روی `client-node1` بود.
+</div>

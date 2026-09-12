@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Ceph Storage
 
 یادداشت‌های دورهٔ **Ceph Administration** (Iran Linux House) از فایل‌های `Ceph/1.mkv` تا `Ceph/7.mkv`.
@@ -10,6 +12,8 @@
 
 ## ویدیو → پوشه
 
+<div dir="ltr">
+
 | ویدیو | جلسه (روی اسلاید) | پوشه‌ها |
 |---|---|---|
 | `1.mkv` | ابتدای دوره (ترتیب موضوع) | [`01 - Concepts`](01%20-%20Concepts) · [`02 - Install`](02%20-%20Install) · [`03 - OSD`](03%20-%20OSD) |
@@ -20,11 +24,15 @@
 | `6.mkv` | هشتم (۲۲ نوامبر ۲۰۲۲) | [`11 - Hardware`](11%20-%20Hardware) · [`12 - Dashboard`](12%20-%20Dashboard) |
 | `7.mkv` | نهم (۲۷ نوامبر ۲۰۲۲) | [`13 - Tuning`](13%20-%20Tuning) · [`14 - OpenStack`](14%20-%20OpenStack) · [`15 - HAProxy`](15%20-%20HAProxy) |
 
+</div>
+
 جلسهٔ هفتم فایل `.mkv` جدا در `Ceph/` ندارد.
 
 پوشه‌های `08` تا `15` از روی فریم ویدیو نوشته شده‌اند. پوشه‌های `01` تا `07` موضوع همان سه ویدیوی اول دوره هستند؛ تقسیم `1`/`2`/`3` روی چند پوشه مثل ویدیوهای بعدی است (یک فایل، چند موضوع).
 
 ## پوشه → ویدیو
+
+<div dir="ltr">
 
 | پوشه | ویدیو |
 |---|---|
@@ -44,6 +52,8 @@
 | `14 - OpenStack` | `7.mkv` |
 | `15 - HAProxy` | `7.mkv` |
 
+</div>
+
 ## فهرست فایل‌ها
 
 - **01 - Concepts** — daemonها، pool، نوع ذخیره‌سازی، CRUSH
@@ -61,3 +71,4 @@
 - **13 - Tuning** — cache، PG، journal، jumbo frame
 - **14 - OpenStack** — Cinder/Glance/libvirt روی hoodadcloud
 - **15 - HAProxy** — roundrobin جلوی دو RGW
+</div>

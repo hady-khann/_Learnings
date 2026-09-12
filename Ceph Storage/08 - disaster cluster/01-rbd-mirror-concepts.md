@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Disaster Cluster و RBD Mirroring
 
 جلسهٔ آنلاین پنجم (Iran Linux House) دربارهٔ بازیابی از فاجعه با **RBD mirroring** بین دو کلاستر Ceph است: یک سایت Active و یک سایت Passive.
@@ -88,3 +90,4 @@ export CEPH_ARGS="--cluster backup"
 بعد از این export، دستورهایی مثل `ceph -s` روی کلاستر disaster کار می‌کنند.
 
 > **هشدار:** اگر `CEPH_ARGS` یا `--cluster` اشتباه باشد، خطای زیر دیده می‌شود: `Error initializing cluster client: ObjectNotFound('RADOS object not found (error read_file)')`.
+</div>

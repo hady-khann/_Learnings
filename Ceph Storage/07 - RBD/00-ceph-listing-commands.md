@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # مرجع سریع دستورات Ceph
 
 مرجعی برای بررسی OSDها، Poolها و ایمیج‌های RBD (بلاک دیوایس) در کلاستر Ceph.
@@ -131,3 +133,4 @@ rbd children mypool/myimage@snap1
 ---
 
 *نکته: دستورات `rbd` نیازمند فعال بودن اپلیکیشن `rbd` روی Pool مقصد هستند (`ceph osd pool application enable <pool> rbd`).*
+</div>

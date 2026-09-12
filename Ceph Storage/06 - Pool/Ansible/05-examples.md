@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # نمونه‌های `ceph.automation.ceph_pool`
 
 ## نمونه 1 — Pool ساده Replicated برای RBD
@@ -257,3 +259,4 @@ ceph osd pool autoscale-status
 را بررسی کنید.
 
 > مثال‌های این فایل الگوهای آموزشی هستند. قبل از استفاده در Production باید پارامترهای Pool، Failure Domain، CRUSH Rule، Replica Size، `min_size` و PG Autoscaler متناسب با طراحی واقعی Cluster بررسی شوند.
+</div>

@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # فعال کردن Dashboard، کاربر admin، و وصل Grafana
 
 روی `ceph-node1` ریپوی APT را از Octopus به Pacific بردند، پکیج `ceph-mgr-dashboard` را بالا آوردند، بعد UI روی `https://192.168.1.15:8443` باز شد. کاربر وب Dashboard با کاربر CephX فرق دارد.
@@ -121,3 +123,4 @@ ceph auth get-or-create client.shobeyr \
   mon 'allow r' \
   osd 'allow rwx pool=anisa'
 ```
+</div>

@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # ایجاد Snapshot و Rollback کردن RBD
 
 این راهنما نحوه ایجاد Snapshot از RBD، بررسی Snapshot، Unmap کردن RBD، انجام Rollback و سپس Map و Mount مجدد آن را نشان می‌دهد.
@@ -80,3 +82,4 @@ df -h /mnt/rbd-mount-app1
 ```text
 /mnt/rbd-mount-app1
 ```
+</div>

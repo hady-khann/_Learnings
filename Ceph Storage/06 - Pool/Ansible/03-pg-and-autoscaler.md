@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Placement Groups و PG Autoscaler
 
 ## `pg_num`
@@ -349,3 +351,4 @@ ceph osd pool set <pool-name> bulk true
 ```
 
 در Production، تنظیم PG باید بر اساس ظرفیت واقعی، تعداد OSDها، تعداد Poolها، نوع Workload و Failure Domain طراحی شود؛ نه صرفاً با یک مقدار ثابت مانند `32`.
+</div>

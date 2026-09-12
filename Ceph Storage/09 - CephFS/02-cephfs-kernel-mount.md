@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # Mount کردن CephFS با Kernel Client
 
 روی `ceph-node1` کاربر `client.fs` بسازید، keyring را به `client-node1` ببرید، و ریشهٔ Filesystem را روی `/mnt/anisa-1` mount کنید. MON اصلی در این لاب `192.168.1.15` (`ceph-node1`) است.
@@ -173,3 +175,4 @@ the client will be added to OSD blacklist and OSD map
 ```
 
 این موضوع در انتهای جلسه با `ceph osd dump` و تلاش برای دستور `blacklist` هم دیده شد؛ دستور لینوکسی `blacklist` وجود ندارد — عملیات روی OSD map با `ceph osd blacklist` / `ceph osd blocklist` است.
+</div>

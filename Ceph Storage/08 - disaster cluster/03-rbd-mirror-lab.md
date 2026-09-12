@@ -1,3 +1,5 @@
+<div dir="rtl" lang="fa">
+
 # راه‌اندازی RBD Mirror بین دو کلاستر
 
 پس از بالا آمدن کلاستر Passive (`backup` روی `ceph-node5/6/7`)، سایت Active (`ceph` روی `ceph-node1/2/3`) را به آن وصل کنید تا Pool به نام `data` mirror شود.
@@ -254,3 +256,4 @@ rbd mirror pool disable data
 > **هشدار:** Image سمت Passive فقط replica است. حذف یا disable را روی primary انجام دهید، یا صریحاً با `force` جلو بروید — در غیر این صورت دادهٔ mirror خراب می‌شود.
 
 اگر بعد از reboot نود disaster وضعیت `unknown` ماند، سرویس `ceph-rbd-mirror@remote` و `ceph -s --cluster backup` را دوباره چک کنید.
+</div>
