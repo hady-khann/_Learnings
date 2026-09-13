@@ -4,6 +4,14 @@
 
 جلسهٔ آنلاین پنجم (Iran Linux House) دربارهٔ بازیابی از فاجعه با **RBD mirroring** بین دو کلاستر Ceph است: یک سایت Active و یک سایت Passive.
 
+نام‌ها در یادداشت با سبک `07 - RBD` هستند (`rbd-pool-app1`، `rbd-image-appN`). معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| `data` | `rbd-pool-app1` |
+| `image-1` … `image-4` | `rbd-image-app1` … `rbd-image-app4` |
+| `anisa-1` / `anisa-2` | `rbd-image-app5` / `rbd-image-app6` |
+
 ## ایدهٔ کلی
 
 RBD mirroring یک **replication ناهمگام (asynchronous)** از Imageهای RBD بین چند کلاستر Ceph است.
@@ -48,9 +56,9 @@ Journaling همهٔ تغییرات Image را **به همان ترتیبی که 
 نمونهٔ ساخت Image مناسب برای mirror:
 
 ```bash
-rbd create anisa-2 \
+rbd create rbd-image-app6 \
   --size 1024 \
-  --pool data \
+  --pool rbd-pool-app1 \
   --image-feature exclusive-lock,journaling
 ```
 
@@ -64,7 +72,7 @@ rbd create anisa-2 \
 در این لاب از **pool mode** استفاده شد:
 
 ```bash
-rbd mirror pool enable data pool
+rbd mirror pool enable rbd-pool-app1 pool
 ```
 
 ## نام کلاستر در این لاب
@@ -73,7 +81,7 @@ rbd mirror pool enable data pool
 | --- | ----- | ----------- |
 | Active / primary | `ceph-node1`, `ceph-node2`, `ceph-node3` | `ceph` (پیش‌فرض) |
 | Passive / disaster | `ceph-node5`, `ceph-node6`, `ceph-node7` | `backup` |
-| Pool | هر دو سمت | `data` |
+| Pool | هر دو سمت | `rbd-pool-app1` |
 
 نسخهٔ پکیج `rbd-mirror` در ویدیو:
 

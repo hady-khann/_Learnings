@@ -2,7 +2,13 @@
 
 # Mount کردن CephFS با Kernel Client
 
-روی `ceph-node1` کاربر `client.fs` بسازید، keyring را به `client-node1` ببرید، و ریشهٔ Filesystem را روی `/mnt/anisa-1` mount کنید. MON اصلی در این لاب `192.168.1.15` (`ceph-node1`) است.
+روی `ceph-node1` کاربر `client.fs` بسازید، keyring را به `client-node1` ببرید، و ریشهٔ Filesystem را روی `/mnt/cephfs-mount-app1` mount کنید. MON اصلی در این لاب `192.168.1.15` (`ceph-node1`) است.
+
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| `/mnt/anisa` / `/mnt/anisa-1` | `/mnt/cephfs-mount-app1` |
 
 ## ۱. ساخت کاربر با Capability محدود
 
@@ -70,10 +76,10 @@ cat /etc/ceph/ceph.client.fs.keyring
 روی `client-node1`:
 
 ```bash
-mkdir /mnt/anisa-1
+mkdir /mnt/cephfs-mount-app1
 ```
 
-اگر `/mnt/anisa` از قبل وجود داشت، خطا می‌دهد؛ برای این لاب مسیر `/mnt/anisa-1` استفاده شد.
+اگر `/mnt/cephfs-mount-app1` از قبل وجود داشت، خطا می‌دهد؛ برای این لاب همان مسیر استفاده شد.
 
 کرنل کلاینت:
 
@@ -108,7 +114,7 @@ failed to resolve source
 شکل کلی:
 
 ```bash
-mount -t ceph <mon>:<port>:/ /mnt/anisa-1 \
+mount -t ceph <mon>:<port>:/ /mnt/cephfs-mount-app1 \
   -o name=<cephx-id>,secret=<key>
 ```
 
@@ -125,14 +131,14 @@ mount -t ceph <mon>:<port>:/ /mnt/anisa-1 \
 دستور موفق:
 
 ```bash
-mount -t ceph 192.168.1.15:6789:/ /mnt/anisa-1 \
+mount -t ceph 192.168.1.15:6789:/ /mnt/cephfs-mount-app1 \
   -o name=fs,secret=AQDnonNj/H9ELRAAfZIl28ZnZ5to/10svC0VdQ==
 ```
 
 `df -h` باید چیزی شبیه این نشان بدهد:
 
 ```text
-192.168.1.15:6789:/   54G    0   54G   0% /mnt/anisa-1
+192.168.1.15:6789:/   54G    0   54G   0% /mnt/cephfs-mount-app1
 ```
 
 > **توجه:** `name=` برابر است با بخش بعد از `client.` در keyring. اینجا `client.fs` → `name=fs`. نام Filesystem (`cephfs`) را اینجا نگذارید.

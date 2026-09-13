@@ -2,7 +2,13 @@
 
 # Glance روی RBD و تلاش برای `nova boot`
 
-بعد از keyring و secret، روی `controller` بک‌اند Glance را به Pool `images` وصل کردند، یک image به نام `anisa` ساختند، و با CLI قدیمی `nova` یک VM زدند. Cinder volume در این جلسه تا ته لاب نشد.
+بعد از keyring و secret، روی `controller` بک‌اند Glance را به Pool `images` وصل کردند، یک image به نام `cirros-app1` ساختند، و با CLI قدیمی `nova` یک VM زدند. Cinder volume در این جلسه تا ته لاب نشد.
+
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| Glance `anisa` / `cirros_anisa_image` | `cirros-app1` |
 
 این محیط `hoodadcloud.ir` است؛ دستورها را روی کلاستر `192.168.1.x` کپی نکنید.
 
@@ -70,7 +76,7 @@ http://download.cirros-cloud.net/0.6.1/cirros-0.6.1-x86_64-disk.img
 CLI قدیمی Glance:
 
 ```bash
-glance image-create --name cirros_anisa_image --is-public true \
+glance image-create --name cirros-app1 --is-public true \
   --disk-format=qcow2 --container-format=bare < cirros-0.6.1-x86_64-disk.img
 ```
 
@@ -101,7 +107,7 @@ openstack image create --file <path> --disk-format qcow2 \
 
 یک‌بار خودِ رشتهٔ `<image_name>` را به‌عنوان اسم تایپ کردند. `--file cirros` هم فقط وقتی کار می‌کند که فایل همین اسم را داشته باشد؛ فایل واقعی `cirros-0.6.1-x86_64-disk.img` بود.
 
-image نهایی که ساخته شد اسمش **`anisa`** است.
+image نهایی که ساخته شد اسمش **`cirros-app1`** است.
 
 ## ۵. تأیید روی Glance و روی RBD
 
@@ -111,7 +117,7 @@ glance image-list
 
 ```text
 ID                                    Name
-1389a02e-4b7f-4806-9fcd-f5fe70a4e107  anisa
+1389a02e-4b7f-4806-9fcd-f5fe70a4e107  cirros-app1
 3e6589e6-d59c-4e2b-9bbf-be6ddf6b4dd5  cirros
 c7d0c659-bab1-4742-99e7-fd8ad051da96  Ubuntu_22.04
 ```
@@ -151,7 +157,7 @@ rbd ls images
 
 یعنی Glance واقعاً روی RADOS نوشته، نه فقط در دیتابیس Glance.
 
-Horizon (`hoodadcloud.ir`) image `anisa` را با Disk Format QCOW2 و Container BARE نشان داد. صفحهٔ Key Pairs خالی بود.
+Horizon (`hoodadcloud.ir`) image `cirros-app1` را با Disk Format QCOW2 و Container BARE نشان داد. صفحهٔ Key Pairs خالی بود.
 
 یک‌بار `cephadm shell` روی `ceph-1` با KeyboardInterrupt قطع شد؛ traceback مال لغو دستی است، نه خطای کلاستر.
 

@@ -4,6 +4,13 @@
 
 روی `ceph-node1` ریپوی APT را از Octopus به Pacific بردند، پکیج `ceph-mgr-dashboard` را بالا آوردند، بعد UI روی `https://192.168.1.15:8443` باز شد. کاربر وب Dashboard با کاربر CephX فرق دارد.
 
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| pool `anisa` | `rbd-pool-app1` |
+| `client.shobeyr` | `client.app1` |
+
 ## ۱. ریپو: اسم فایل Octopus، محتوای Pacific
 
 روی `ceph-node2` فایل هنوز اسم قدیمی داشت:
@@ -79,7 +86,7 @@ ceph config set mgr mgr/dashboard/ssl false
 https://192.168.1.15:8443
 ```
 
-لیست Pool در UI همان لاب: `anis` (application `mgr_devicehealth`)، `anisa`، `cephfs_data`، `cephfs_metadata`، `rbd`. صفحهٔ Monitoring/Alerts بدون URL پرومتهوس خالی می‌ماند.
+لیست Pool در UI همان لاب: `anis` (application `mgr_devicehealth`)، `rbd-pool-app1`، `cephfs_data`، `cephfs_metadata`، `rbd`. صفحهٔ Monitoring/Alerts بدون URL پرومتهوس خالی می‌ماند.
 
 ## ۳. کاربر Dashboard (نه CephX)
 
@@ -114,13 +121,13 @@ ceph dashboard set-alertmanager-api-host http://192.168.1.15:9093
 
 ## ۵. مرور CephX و HAProxy (لاب این جلسه نیست)
 
-آخر جلسه `ceph auth get-or-create client.shobeyr` با Pool `anisa` زده شد — همان الگوی `05 - Cephx`. کاربرهای `client.admin` / `client.anisa` را از نو نسازید.
+آخر جلسه `ceph auth get-or-create client.app1` با Pool `rbd-pool-app1` زده شد — همان الگوی `05 - Cephx`. کاربرهای `client.admin` را از نو نسازید.
 
 جستجوی Google برای **HAProxy + RGW** و اشاره به NFS-Ganesha در چت ماند؛ نصب نشد.
 
 ```bash
-ceph auth get-or-create client.shobeyr \
+ceph auth get-or-create client.app1 \
   mon 'allow r' \
-  osd 'allow rwx pool=anisa'
+  osd 'allow rwx pool=rbd-pool-app1'
 ```
 </div>

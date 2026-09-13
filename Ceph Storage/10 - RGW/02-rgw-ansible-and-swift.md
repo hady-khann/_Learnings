@@ -4,6 +4,14 @@
 
 نود `rgw-node1` (`192.168.1.11`) را به Inventory اضافه کنید، Playbook را دوباره اجرا کنید، کاربر Object بسازید، و از `client-node1` با CLI `swift` یک bucket بسازید.
 
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| `anisa-rgw` | `rgw-user-app1` |
+| `anisa-rgw:swift` | `rgw-user-app1:swift` |
+| `anisa-bucket` | `rgw-bucket-app1` |
+
 ## ۱. Hostname نود RGW
 
 روی خود `rgw-node1` در `/etc/hosts`:
@@ -67,13 +75,13 @@ ceph osd pool ls
 could not create subuser: unable to parse request, user info was not populated
 ```
 
-یعنی `uid=anisa-rgw` هنوز وجود ندارد.
+یعنی `uid=rgw-user-app1` هنوز وجود ندارد.
 
 روی `rgw-node1`:
 
 ```bash
 radosgw-admin user create \
-  --uid=anisa-rgw \
+  --uid=rgw-user-app1 \
   --display-name="Iran Linux House" \
   --email=info@anisa.co.ir \
   --access=full \
@@ -87,8 +95,8 @@ radosgw-admin user create \
 
 ```bash
 radosgw-admin subuser create \
-  --uid=anisa-rgw \
-  --subuser=anisa-rgw:swift \
+  --uid=rgw-user-app1 \
+  --subuser=rgw-user-app1:swift \
   --access=full \
   -k /var/lib/ceph/radosgw/ceph-rgw.rgw-node1.rgw0/keyring \
   --name client.rgw.rgw-node1.rgw0
@@ -97,7 +105,7 @@ radosgw-admin subuser create \
 اطلاعات کاربر:
 
 ```bash
-radosgw-admin user info --uid=anisa-rgw \
+radosgw-admin user info --uid=rgw-user-app1 \
   -k /var/lib/ceph/radosgw/ceph-rgw.rgw-node1.rgw0/keyring \
   --name client.rgw.rgw-node1.rgw0
 ```
@@ -122,7 +130,7 @@ auth: error reading file: ... (21) Is a directory
 
 ```bash
 swift -A http://192.168.1.11:8080/auth/1.0 \
-  -U anisa-rgw:swift \
+  -U rgw-user-app1:swift \
   -K rwWMVDpLqVqwDvMS00frFCT9c7I6hAhF1Ito3hIG \
   list
 ```
@@ -131,15 +139,15 @@ swift -A http://192.168.1.11:8080/auth/1.0 \
 
 ```bash
 swift -A http://192.168.1.11:8080/auth/1.0 \
-  -U anisa-rgw:swift \
+  -U rgw-user-app1:swift \
   -K rwWMVDpLqVqwDvMS00frFCT9c7I6hAhF1Ito3hIG \
-  post anisa-bucket
+  post rgw-bucket-app1
 ```
 
 دوباره `list`:
 
 ```text
-anisa-bucket
+rgw-bucket-app1
 ```
 
 `-A` آدرس Auth، `-U` همان subuser، `-K` کلید Swift است.

@@ -4,6 +4,13 @@
 
 جلسهٔ آنلاین ششم (Iran Linux House، ۱۵ نوامبر ۲۰۲۲) با **CephFS** شروع می‌شود: یک POSIX filesystem روی همان RADOS که RBD از آن استفاده می‌کند.
 
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| pool `anisa` | `rbd-pool-app1` |
+| `/mnt/anisa-1` | `/mnt/cephfs-mount-app1` |
+
 برخلاف RBD که یک Block Device به کلاینت می‌دهد، CephFS یک درخت فایل مشترک (`/` تا فایل‌ها) روی چند کلاینت mount می‌شود.
 
 ## اجزا
@@ -73,7 +80,7 @@ Poolهای دیده‌شده:
 ```text
 device_health_metrics
 anis
-anisa
+rbd-pool-app1
 rbd
 cephfs_data
 cephfs_metadata

@@ -4,6 +4,14 @@
 
 نیمهٔ دوم جلسهٔ ششم Object Storage است: **RGW** (`radosgw`) یک HTTP API روی RADOS می‌گذارد تا کلاینت‌ها با پروتکل **S3** (آمازون) یا **Swift** (OpenStack) کار کنند.
 
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| `anisa-rgw` | `rgw-user-app1` |
+| `anisa-rgw:swift` | `rgw-user-app1:swift` |
+| `anisa-bucket` | `rgw-bucket-app1` |
+
 RBD و CephFS کلاینت را به کلاستر وصل می‌کنند. RGW همان داده را از مسیر REST می‌دهد؛ اپلیکیشن نیازی به کتابخانهٔ `librados` ندارد.
 
 ## معماری
@@ -73,7 +81,7 @@ http://192.168.1.11:8080/auth/1.0
 | لایه | نمونه در لاب | کار |
 |---|---|---|
 | CephX برای خود daemon | `client.rgw.rgw-node1.rgw0` در `/var/lib/ceph/radosgw/ceph-rgw.rgw-node1.rgw0/keyring` | تا RGW به MON/OSD وصل شود |
-| کاربر Object (S3/Swift) | `uid=anisa-rgw` و subuser `anisa-rgw:swift` | تا کلاینت HTTP به bucket برسد |
+| کاربر Object (S3/Swift) | `uid=rgw-user-app1` و subuser `rgw-user-app1:swift` | تا کلاینت HTTP به bucket برسد |
 
 `radosgw-admin` را باید با keyring خود RGW صدا بزنید (`-k` و `--name`)، نه با `client.admin` روی نودی که keyring RGW ندارد.
 

@@ -2,7 +2,15 @@
 
 # راه‌اندازی RBD Mirror بین دو کلاستر
 
-پس از بالا آمدن کلاستر Passive (`backup` روی `ceph-node5/6/7`)، سایت Active (`ceph` روی `ceph-node1/2/3`) را به آن وصل کنید تا Pool به نام `data` mirror شود.
+پس از بالا آمدن کلاستر Passive (`backup` روی `ceph-node5/6/7`)، سایت Active (`ceph` روی `ceph-node1/2/3`) را به آن وصل کنید تا Pool به نام `rbd-pool-app1` mirror شود.
+
+نام‌ها در یادداشت با سبک `07 - RBD` هستند. معادل ویدیو:
+
+| ویدیو | نام یادداشت |
+|---|---|
+| `data` | `rbd-pool-app1` |
+| `image-1` … `image-4` | `rbd-image-app1` … `rbd-image-app4` |
+| `anisa-1` / `anisa-2` | `rbd-image-app5` / `rbd-image-app6` |
 
 ## ۱. ساخت کاربر روی کلاستر Disaster
 
@@ -91,10 +99,10 @@ systemctl status ceph-rbd-mirror@remote.service
 
 ## ۵. Enable کردن mirroring روی Pool
 
-روی **هر دو** کلاستر، برای Pool `data` و در حالت pool:
+روی **هر دو** کلاستر، برای Pool `rbd-pool-app1` و در حالت pool:
 
 ```bash
-rbd mirror pool enable data pool
+rbd mirror pool enable rbd-pool-app1 pool
 ```
 
 اگر از قبل enable شده باشد:
@@ -108,7 +116,7 @@ rbd: mirroring is already configured for pool mode
 روی سایت Passive (`ceph-node5`)، peer را به کلاستر Active وصل کنید:
 
 ```bash
-rbd mirror pool peer add data client.local@ceph
+rbd mirror pool peer add rbd-pool-app1 client.local@ceph
 ```
 
 خروجی یک UUID است، مثلاً:
@@ -120,7 +128,7 @@ rbd mirror pool peer add data client.local@ceph
 بررسی:
 
 ```bash
-rbd mirror pool info data
+rbd mirror pool info rbd-pool-app1
 ```
 
 نمونهٔ خروجی لاب:
@@ -146,36 +154,36 @@ rbd: error opening default pool 'rbd'
 روی `ceph-node1`:
 
 ```bash
-rbd create image-1 \
+rbd create rbd-image-app1 \
   --size 1024 \
-  --pool data \
+  --pool rbd-pool-app1 \
   --image-feature exclusive-lock,journaling
 
-rbd create image-2 \
+rbd create rbd-image-app2 \
   --size 1024 \
-  --pool data \
+  --pool rbd-pool-app1 \
   --image-feature exclusive-lock,journaling
 ```
 
 لیست:
 
 ```bash
-rbd -p data ls
+rbd -p rbd-pool-app1 ls
 ```
 
 ```text
-image-1
-image-2
+rbd-image-app1
+rbd-image-app2
 ```
 
-در ادامهٔ لاب Imageهای `image-3` و `image-4` و همچنین `anisa-1` / `anisa-2` هم ساخته شدند.
+در ادامهٔ لاب Imageهای `rbd-image-app3` و `rbd-image-app4` و همچنین `rbd-image-app5` / `rbd-image-app6` هم ساخته شدند.
 
 ## ۸. وضعیت Mirror
 
 روی سایت Passive:
 
 ```bash
-rbd mirror pool status data
+rbd mirror pool status rbd-pool-app1
 ```
 
 وقتی replay شروع شده باشد:
@@ -188,7 +196,7 @@ images: 2 total  2 starting replay
 بعد از همگام شدن Image:
 
 ```bash
-rbd mirror image status data/anisa-1
+rbd mirror image status rbd-pool-app1/rbd-image-app5
 ```
 
 ```text
@@ -199,12 +207,12 @@ service: remote on ceph-node5
 و همان Imageها روی disaster دیده می‌شوند:
 
 ```bash
-rbd -p data ls
+rbd -p rbd-pool-app1 ls
 ```
 
 ```text
-anisa-1
-anisa-2
+rbd-image-app5
+rbd-image-app6
 ```
 
 اگر daemon گیر کرد:
@@ -222,8 +230,8 @@ rbd-mirror: 1 daemon active
 ## ۹. حذف Peer (در صورت نیاز)
 
 ```bash
-rbd mirror pool info data
-rbd mirror pool peer remove data 431f522d-dcd3-4450-804d-b845e1b70bad
+rbd mirror pool info rbd-pool-app1
+rbd mirror pool peer remove rbd-pool-app1 431f522d-dcd3-4450-804d-b845e1b70bad
 ```
 
 تا وقتی peer ثبت است، disable کردن mirroring Pool شکست می‌خورد:
@@ -237,7 +245,7 @@ peers still registered
 حذف Image روی سایت Passive (نسخهٔ non-primary) بدون force:
 
 ```bash
-rbd rm -p data image-4
+rbd rm -p rbd-pool-app1 rbd-image-app4
 ```
 
 ```text
@@ -248,7 +256,7 @@ rbd: delete error: (22) Invalid argument
 خاموش کردن mirroring کل Pool وقتی هنوز Imageهای replica هستند:
 
 ```bash
-rbd mirror pool disable data
+rbd mirror pool disable rbd-pool-app1
 ```
 
 همان خطای «not primary / add force» را می‌دهد.
