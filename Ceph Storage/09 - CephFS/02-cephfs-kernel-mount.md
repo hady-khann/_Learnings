@@ -144,7 +144,7 @@ mount -t ceph 192.168.1.15:6789:/ /mnt/cephfs-mount-app1 \
   -o name=fs,secret=AQDnonNj/H9ELRAAfZIl28ZnZ5to/10svC0VdQ==
 ```
 
-`df -h` باید چیزی شبیه این نشان بدهد:
+خروجی خروجی `df -h` باید چیزی شبیه این نشان بدهد:
 
 ```text
 192.168.1.15:6789:/   54G    0   54G   0% /mnt/cephfs-mount-app1
@@ -172,7 +172,7 @@ cephfs:1 {0=ceph-node2=up:active}
 
 ## خطاهایی که در لاب دیده شد
 
-**Broken pipe هنگام `ceph auth list | grep`**
+**خطای Broken pipe هنگام `ceph auth list | grep`**
 
 ```text
 BrokenPipeError: [Errno 32] Broken pipe
@@ -180,7 +180,7 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 خروجی `ceph auth list` طولانی است؛ بستن لوله با `grep` در پایتون ۳ این traceback را می‌دهد. خود دستور auth مشکلی ندارد.
 
-**Blacklist کلاینت CephFS**
+**لیست سیاه (Blacklist) کلاینت CephFS**
 
 اگر کلاینت شبکهٔ ناپایدار داشته باشد، OSD ممکن است آن را blacklist کند (پیش‌فرض حدود یک ساعت). یعنی کلاستر عمداً آن کلاینت را از نقشه کنار می‌گذارد تا OSD منتظر I/Oی گیرکرده نماند. اسم جدیدتر دستور `blocklist` است؛ لینوکس دستور `blacklist` ندارد.
 

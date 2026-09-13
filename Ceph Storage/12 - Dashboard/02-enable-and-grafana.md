@@ -37,7 +37,7 @@ ceph-mds
 ceph-osd
 ```
 
-`ceph versions` بعد از این کار هنوز مخلوط بود:
+دستور `ceph versions` بعد از این کار هنوز مخلوط بود:
 
 ```text
 "osd":  "ceph version 16.2.10 ... pacific (stable)": 9
@@ -53,7 +53,7 @@ ceph-osd
 
 ## ۲. پورت ۸۴۴۳ اول Connection refused
 
-Dashboard روی HTTPS گوش می‌دهد تا مرورگر به UI مدیریت وصل شود. `create-self-signed-cert` یک گواهی موقت می‌سازد (مرورگر warning می‌دهد؛ برای لاب کافی است). تا گواهی و bind روی `8443` نباشد، `curl http://…:8443` با Connection refused برمی‌گردد — هم به‌خاطر `http` به‌جای `https`، هم چون هنوز هیچ‌چیز به پورت bind نشده.
+ماژول **Dashboard** روی HTTPS گوش می‌دهد تا مرورگر به UI مدیریت وصل شود. `create-self-signed-cert` یک گواهی موقت می‌سازد (مرورگر warning می‌دهد؛ برای لاب کافی است). تا گواهی و bind روی `8443` نباشد، `curl http://…:8443` با Connection refused برمی‌گردد — هم به‌خاطر `http` به‌جای `https`، هم چون هنوز هیچ‌چیز به پورت bind نشده.
 
 ```bash
 docker ps
@@ -111,7 +111,7 @@ ceph dashboard ac-user-create admin -i
 
 ## ۴. وصل Grafana / Prometheus / Alertmanager
 
-Dashboard نمودار را خودش scrape نمی‌کند؛ فقط iframe/API به Grafana می‌زند. اگر این URLها خالی باشند، صفحهٔ Monitoring/Alerts خالی می‌ماند — Grafana روی ۳۰۰۰ ممکن است سالم باشد ولی Dashboard نمی‌داند کجاست.
+خود **Dashboard** نمودار را خودش scrape نمی‌کند؛ فقط iframe/API به Grafana می‌زند. اگر این URLها خالی باشند، صفحهٔ Monitoring/Alerts خالی می‌ماند — Grafana روی ۳۰۰۰ ممکن است سالم باشد ولی Dashboard نمی‌داند کجاست.
 
 Containerها روی همین نود بودند. دستورهای چت:
 

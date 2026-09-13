@@ -61,8 +61,8 @@
      SWITCH#1              SWITCH#2     ← Cluster Network
 ```
 
-- **Client Network**: MON، کلاینت RBD/CephFS/RGW، Dashboard
-- **Cluster Network**: replication و recovery بین OSDها (heartbeat و backfill)
+- شبکهٔ **Client Network**: MON، کلاینت RBD/CephFS/RGW، Dashboard
+- شبکهٔ **Cluster Network**: replication و recovery بین OSDها (heartbeat و backfill)
 
 هر سمت دو سوئیچ دارد تا یک سوئیچ تک‌نقطهٔ شکست نباشد. در چت کلاس از **bond** و اینکه لینک Fiber با لینک مسی فرق دارد صحبت شد؛ اسلاید خودِ bonding را پیکربندی نمی‌کند.
 

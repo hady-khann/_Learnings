@@ -69,7 +69,7 @@ ceph osd pool ls
 
 ## ۳. ساخت کاربر Object — ترتیب مهم است
 
-**user** حساب اصلی Object است (uid، معمولاً کلید S3). **subuser** هویت وابسته برای Swift است؛ شکل `rgw-user-app1:swift` یعنی «حساب Swift آویزان به همان uid». بدون user، subuser جایی برای وصل شدن ندارد — برای همین اول `user create`، بعد `subuser create`.
+**کاربر (user)** حساب اصلی Object است (uid، معمولاً کلید S3). **subuser** هویت وابسته برای Swift است؛ شکل `rgw-user-app1:swift` یعنی «حساب Swift آویزان به همان uid». بدون user، subuser جایی برای وصل شدن ندارد — برای همین اول `user create`، بعد `subuser create`.
 
 اول **user**، بعد **subuser**. در لاب اول `subuser create` زدند و این خطا آمد:
 
@@ -160,11 +160,11 @@ swift -A http://192.168.1.11:8080/auth/1.0 \
 rgw-bucket-app1
 ```
 
-`-A` آدرس Auth، `-U` همان subuser، `-K` کلید Swift است.
+پرچم `-A` آدرس Auth، `-U` همان subuser، `-K` کلید Swift است.
 
-S3 با `s3cmd` در چت کلاس مطرح شد ولی در این جلسه CLI Swift اجرا شد. SDKهایی مثل AWS PHP هم به همان endpoint روی پورت ۸۰۸۰ وصل می‌شوند.
+ابزار ابزار S3 با `s3cmd` در چت کلاس مطرح شد ولی در این جلسه CLI Swift اجرا شد. SDKهایی مثل AWS PHP هم به همان endpoint روی پورت ۸۰۸۰ وصل می‌شوند.
 
 ## ۵. فضای مصرف‌شده بعد از RGW
 
-`ceph df` بعد از بالا آمدن Gateway Poolهای جدید را نشان می‌دهد؛ مثلاً `default.rgw.log` چند مگابایت log دارد حتی قبل از بار واقعی. Filesystem CephFS هم در همان خروجی هست (`cephfs_data` / `cephfs_metadata`) — RGW آن‌ها را جایگزین نمی‌کند.
+خروجی `ceph df` بعد از بالا آمدن Gateway Poolهای جدید را نشان می‌دهد؛ مثلاً `default.rgw.log` چند مگابایت log دارد حتی قبل از بار واقعی. Filesystem CephFS هم در همان خروجی هست (`cephfs_data` / `cephfs_metadata`) — RGW آن‌ها را جایگزین نمی‌کند.
 </div>

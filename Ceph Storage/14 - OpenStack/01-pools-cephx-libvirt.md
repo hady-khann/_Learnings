@@ -21,9 +21,9 @@ mon_host = [v2:185.55.227.16:3300/0,v1:185.55.227.16:6789/0] [v2:185.55.227.42:3
 
 روی `ceph-1` در `/etc/ceph` فقط `ceph.conf`، `ceph.keyring`، `rbdmap` بود. دستور `clear` نصب نبود.
 
-Glance و ساخت image در `02-glance-and-nova.md` است. HAProxy روی همین نود در `15 - HAProxy`.
+ساخت image در **Glance** و فایل `02-glance-and-nova.md` است. HAProxy روی همین نود در `15 - HAProxy`.
 
-OpenStack چند سرویس جداست که اینجا به Ceph وصل می‌شوند. Keystone احراز هویت *اوپن‌استک* است، نه CephX:
+پلتفرم **OpenStack** چند سرویس جداست که اینجا به Ceph وصل می‌شوند. Keystone احراز هویت *اوپن‌استک* است، نه CephX:
 
 | سرویس | کار | ربط به Ceph در این لاب |
 |---|---|---|
@@ -34,7 +34,7 @@ OpenStack چند سرویس جداست که اینجا به Ceph وصل می‌�
 | **Cinder** | دیسک ماندگار قابل attach | Pool `volumes` |
 | **libvirt / KVM** | hypervisor روی compute | با `virsh secret` کلید Ceph را به QEMU می‌دهد |
 
-Controller APIها را دارد؛ compute خود VM را اجرا می‌کند — برای همین `virsh` روی compute است نه controller.
+نود **Controller** APIها را دارد؛ compute خود VM را اجرا می‌کند — برای همین `virsh` روی compute است نه controller.
 
 ## ۱. کپی `ceph.conf` به controller
 
@@ -116,7 +116,7 @@ ceph auth get-or-create client.cinder \
   osd 'allow * pool=volumes, allow * pool=vms, allow * pool=images'
 ```
 
-`get-or-create` اگر کاربر از قبل باشد کلید قبلی را برمی‌گرداند و cap را عوض نمی‌کند؛ برای عوض کردن cap از `ceph auth caps` استفاده کنید.
+دستور `get-or-create` اگر کاربر از قبل باشد کلید قبلی را برمی‌گرداند و cap را عوض نمی‌کند؛ برای عوض کردن cap از `ceph auth caps` استفاده کنید.
 
 ## ۴. کاربر `client.glance` و ریختن keyring روی controller
 
@@ -154,11 +154,11 @@ ceph -s --name ceph.client.cinder.keyring
 Error initializing cluster client: rados_initialize failed with error code: -22
 ```
 
-`--name` مقدار CephX است (`client.cinder`)، نه مسیر keyring. keyring را با `-k` یا گذاشتن فایل در `/etc/ceph` بدهید.
+گزینهٔ `--name` مقدار CephX است (`client.cinder`)، نه مسیر keyring. keyring را با `-k` یا گذاشتن فایل در `/etc/ceph` بدهید.
 
 ## ۶. `secret.xml` برای libvirt
 
-QEMU روی compute باید Image RBD را مثل دیسک به VM بچسباند. برای این کار کلید Ceph (`client.cinder`) لازم است، ولی libvirt آن را از فایل keyring نمی‌خواند: یک **secret** با UUID می‌سازد و کلید را داخل آن می‌گذارد. Nova/Cinder در کانفیگ همان UUID را می‌نویسند. اگر UUID فایل `secret.xml` با UUID داخل `nova.conf` / `cinder.conf` یکی نباشد، attach شکست می‌خورد.
+هایپروایزر **QEMU** روی compute باید Image RBD را مثل دیسک به VM بچسباند. برای این کار کلید Ceph (`client.cinder`) لازم است، ولی libvirt آن را از فایل keyring نمی‌خواند: یک **secret** با UUID می‌سازد و کلید را داخل آن می‌گذارد. Nova/Cinder در کانفیگ همان UUID را می‌نویسند. اگر UUID فایل `secret.xml` با UUID داخل `nova.conf` / `cinder.conf` یکی نباشد، attach شکست می‌خورد.
 
 روی **controller** در `/etc/ceph`:
 
@@ -191,7 +191,7 @@ virsh secret-define --file secret.xml
 bash: virsh: command not found
 ```
 
-`virsh` روی controller نبود. فایل را به compute بردند و آنجا تعریف کردند.
+دستور `virsh` روی controller نبود. فایل را به compute بردند و آنجا تعریف کردند.
 
 کپی keyring خام:
 

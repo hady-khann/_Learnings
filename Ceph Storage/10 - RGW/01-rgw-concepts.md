@@ -12,7 +12,7 @@
 | `anisa-rgw:swift` | `rgw-user-app1:swift` |
 | `anisa-bucket` | `rgw-bucket-app1` |
 
-RBD و CephFS کلاینت را به کلاستر وصل می‌کنند. RGW همان داده را از مسیر REST می‌دهد؛ اپلیکیشن نیازی به کتابخانهٔ `librados` ندارد. یعنی بک‌آپ، سایت استاتیک یا SDK آمازون فقط HTTP می‌زند — لازم نیست پکیج Ceph روی آن ماشین باشد.
+مسیرهای **RBD** و **CephFS** کلاینت را به کلاستر وصل می‌کنند. RGW همان داده را از مسیر REST می‌دهد؛ اپلیکیشن نیازی به کتابخانهٔ `librados` ندارد. یعنی بک‌آپ، سایت استاتیک یا SDK آمازون فقط HTTP می‌زند — لازم نیست پکیج Ceph روی آن ماشین باشد.
 
 دنیای Object سه مفهوم دارد:
 
@@ -35,13 +35,13 @@ CLIENTS
               RESTful HTTP / S Access
 ```
 
-- **S3 API** — لهجهٔ HTTP آمازون؛ رایج‌تر؛ ابزارهایی مثل `s3cmd`، AWS SDK، PHP SDK.
-- **Swift API** — لهجهٔ HTTP اوپن‌استک برای *همان* داده روی RADOS. در این لاب با CLI به نام `swift` روی `client-node1` تست شد.
-- **Admin API** — `radosgw-admin` برای ساخت کاربر، subuser، کلید.
+- پروتکل **S3 API** — لهجهٔ HTTP آمازون؛ رایج‌تر؛ ابزارهایی مثل `s3cmd`، AWS SDK، PHP SDK.
+- پروتکل **Swift API** — لهجهٔ HTTP اوپن‌استک برای *همان* داده روی RADOS. در این لاب با CLI به نام `swift` روی `client-node1` تست شد.
+- پروتکل **Admin API** — `radosgw-admin` برای ساخت کاربر، subuser، کلید.
 
-S3 و Swift دو پروتکل جدا هستند، نه دو کلاستر. کاربر Object می‌تواند هر دو را داشته باشد (در لاب uid برای S3 و subuser برای Swift).
+پروتکل‌های **S3** و **Swift** دو لهجهٔ جدا هستند، نه دو کلاستر. کاربر Object می‌تواند هر دو را داشته باشد (در لاب uid برای S3 و subuser برای Swift).
 
-RGW یک daemon جدا است (`rgw.rgw-node1.rgw0`)، نه روی MON/OSD. در لاب روی VM جدا به نام `rgw-node1` با IP `192.168.1.11` نصب شد.
+سرویس **RGW** یک daemon جدا است (`rgw.rgw-node1.rgw0`)، نه روی MON/OSD. در لاب روی VM جدا به نام `rgw-node1` با IP `192.168.1.11` نصب شد.
 
 ## Poolهایی که Ansible می‌سازد
 
@@ -65,7 +65,7 @@ default.rgw.meta
 default.rgw.buckets.index
 ```
 
-`ceph -s` باید خط سرویس RGW را نشان بدهد:
+دستور `ceph -s` باید خط سرویس RGW را نشان بدهد:
 
 ```text
 rgw: 1 daemon active (rgw-node1.rgw0)
@@ -75,7 +75,7 @@ rgw: 1 daemon active (rgw-node1.rgw0)
 
 ## Frontend: Civetweb روی پورت ۸۰۸۰
 
-Frontend همان HTTP server داخل فرآیند `radosgw` است. **Civetweb** پیش‌فرض قدیمی‌تر (همین دوره / Octopus)؛ **Beast** جایگزین جدیدتر روی نسخه‌های بعدی. پورت `8080` یعنی کلاینت به `http://rgw-node1:8080` می‌زند، نه به MON روی `6789`.
+لایهٔ **Frontend** همان HTTP server داخل فرآیند `radosgw` است. **Civetweb** پیش‌فرض قدیمی‌تر (همین دوره / Octopus)؛ **Beast** جایگزین جدیدتر روی نسخه‌های بعدی. پورت `8080` یعنی کلاینت به `http://rgw-node1:8080` می‌زند، نه به MON روی `6789`.
 
 در `ceph-ansible/group_vars/all.yml`:
 
@@ -84,13 +84,13 @@ Frontend همان HTTP server داخل فرآیند `radosgw` است. **Civetweb
 radosgw_civetweb_port: 8080
 ```
 
-Octopus در این دوره هنوز Civetweb را به‌عنوان frontend پیش‌فرض دارد. Endpoint لاب:
+نسخهٔ **Octopus** در این دوره هنوز Civetweb را به‌عنوان frontend پیش‌فرض دارد. Endpoint لاب:
 
 ```text
 http://192.168.1.11:8080
 ```
 
-Auth Swift نسخهٔ ۱:
+مسیر Auth Swift نسخهٔ ۱:
 
 ```text
 http://192.168.1.11:8080/auth/1.0
@@ -105,7 +105,7 @@ http://192.168.1.11:8080/auth/1.0
 | CephX برای خود daemon | `client.rgw.rgw-node1.rgw0` در `/var/lib/ceph/radosgw/ceph-rgw.rgw-node1.rgw0/keyring` | تا RGW به MON/OSD وصل شود — مثل کلید هر daemon دیگر |
 | کاربر Object (S3/Swift) | `uid=rgw-user-app1` و subuser `rgw-user-app1:swift` | تا کلاینت HTTP به bucket برسد — این کلید داخل CephX نیست |
 
-`radosgw-admin` را باید با keyring خود RGW صدا بزنید (`-k` و `--name`)، نه با `client.admin` روی نودی که keyring RGW ندارد. دلیل: دستور ادمین از خودِ Gateway می‌پرسد، نه از MON؛ پس باید با هویت daemon RGW احراز شود.
+دستور `radosgw-admin` را باید با keyring خود RGW صدا بزنید (`-k` و `--name`)، نه با `client.admin` روی نودی که keyring RGW ندارد. دلیل: دستور ادمین از خودِ Gateway می‌پرسد، نه از MON؛ پس باید با هویت daemon RGW احراز شود.
 
 ## Keystone (فقط بحث کلاس)
 
@@ -121,8 +121,8 @@ rgw s3 auth use keystone = true
 
 مستندات اشاره‌شده در جلسه:
 
-- `https://docs.ceph.com/en/latest/radosgw/keystone/`
-- PHP S3 examples در docs.ceph.com
+- آدرس `https://docs.ceph.com/en/latest/radosgw/keystone/`
+- مثال‌های PHP S3 در docs.ceph.com
 
 ## نظارت
 

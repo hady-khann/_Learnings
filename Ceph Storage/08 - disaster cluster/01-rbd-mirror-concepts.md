@@ -23,7 +23,7 @@
 
 اضافه کردن OSD به **همان** کلاستر، فاجعهٔ سایت را نجات نمی‌دهد: اگر رک Active از بین برود، هر سه replica هم با آن می‌روند. برای Disaster Recovery باید کلاستر دومی با MON/OSD مال خودش داشته باشید.
 
-RBD mirroring یک **replication ناهمگام (asynchronous)** از Imageهای RBD بین چند کلاستر Ceph است. ناهمگام یعنی سایت Passive چند لحظه عقب‌تر است؛ نوشتن روی Active منتظر تأیید سایت مقابل نمی‌ماند.
+آینه‌سازی RBD (RBD mirroring) یک **replication ناهمگام (asynchronous)** از Imageهای RBD بین چند کلاستر Ceph است. ناهمگام یعنی سایت Passive چند لحظه عقب‌تر است؛ نوشتن روی Active منتظر تأیید سایت مقابل نمی‌ماند.
 
 یک replica با نقطهٔ زمانی مشخص (point-in-time) از هر تغییر روی Image ساخته می‌شود؛ از جمله:
 
@@ -49,7 +49,7 @@ ACTIVE CLUSTER                      PASSIVE CLUSTER
 - کلاستر Passive با `rbd-mirror` همان Imageها را replay می‌کند.
 - هر دو سمت daemon مربوط به `rbd-mirror` دارند؛ جهت همگام‌سازی با **peer** مشخص می‌شود (`rx-tx`). Peer یعنی ثبت کلاستر مقابل؛ بدون آن mirroring مبدأ ندارد. شرح کامل در `03-rbd-mirror-lab.md`.
 
-Mirroring می‌تواند **active+passive** یا **active+active** باشد. در این لاب مدل Active/Passive پیاده شد.
+آینه‌سازی (Mirroring) می‌تواند **active+passive** یا **active+active** باشد. در این لاب مدل Active/Passive پیاده شد.
 
 ## پیش‌نیاز Image: journaling و exclusive-lock
 
@@ -60,9 +60,9 @@ exclusive-lock
 journaling
 ```
 
-**journaling چیست؟** یک write-ahead log روی خود Image: هر نوشتن اول به ترتیب در journal ثبت می‌شود، بعد روی داده. daemon سمت Passive همین journal را می‌خواند و **replay** می‌کند (دوباره همان ترتیب را روی کپی محلی اجرا می‌کند). بدون journal، سایت مقابل نمی‌داند کدام بلاک‌ها به چه ترتیبی عوض شده‌اند.
+**ژورنال (journaling) چیست؟** یک write-ahead log روی خود Image: هر نوشتن اول به ترتیب در journal ثبت می‌شود، بعد روی داده. daemon سمت Passive همین journal را می‌خواند و **replay** می‌کند (دوباره همان ترتیب را روی کپی محلی اجرا می‌کند). بدون journal، سایت مقابل نمی‌داند کدام بلاک‌ها به چه ترتیبی عوض شده‌اند.
 
-**exclusive-lock چیست؟** قفلی که در هر لحظه فقط یک کلاینت «مالک نوشتن» Image باشد. برای mirror لازم است چون فقط **یک طرف primary** اجازهٔ نوشتن دارد؛ وگرنه دو سایت همزمان می‌نویسند و journal قابل replay نیست.
+**قفل انحصاری (exclusive-lock) چیست؟** قفلی که در هر لحظه فقط یک کلاینت «مالک نوشتن» Image باشد. برای mirror لازم است چون فقط **یک طرف primary** اجازهٔ نوشتن دارد؛ وگرنه دو سایت همزمان می‌نویسند و journal قابل replay نیست.
 
 بدون این دو Feature، mirroring کار نمی‌کند.
 
@@ -82,7 +82,7 @@ rbd create rbd-image-app6 \
 | `pool`  | همهٔ Imageهای Pool (با journaling) به‌صورت خودکار mirror می‌شوند | وقتی کل Pool اپ باید در سایت DR باشد — همین لاب |
 | `image` | فقط Imageهایی که جداگانه enable شده‌اند | وقتی چند Image در Pool هست و فقط بعضی باید replicate شوند |
 
-`rbd mirror pool enable … pool` فقط می‌گوید «این Pool *اجازه* دارد mirror شود». هنوز سایت مقابل را نمی‌شناسد؛ آن کار با **peer** است (فایل `03-rbd-mirror-lab.md`).
+دستور `rbd mirror pool enable … pool` فقط می‌گوید «این Pool *اجازه* دارد mirror شود». هنوز سایت مقابل را نمی‌شناسد؛ آن کار با **peer** است (فایل `03-rbd-mirror-lab.md`).
 
 در این لاب از **pool mode** استفاده شد:
 

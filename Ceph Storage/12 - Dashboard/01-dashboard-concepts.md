@@ -4,9 +4,9 @@
 
 نیمهٔ دوم جلسهٔ هشتم Dashboard را روی همان کلاستر لاب (`ceph-node1` = `192.168.1.15`) بالا می‌آورد. Grafana/Prometheus از قبل به‌صورت Container روی نود بودند؛ مشکل اصلی این بود که پورت ۸۴۴۳ جواب نمی‌داد تا پکیج `ceph-mgr-dashboard` و نسخهٔ Pacific درست شود.
 
-Hardware این جلسه در پوشهٔ `11 - Hardware` است. ساخت کاربر CephX (`client.app1`) فقط مرور `05 - Cephx` بود؛ اینجا تکرار نمی‌شود.
+سخت‌افزار این جلسه در پوشهٔ `11 - Hardware` است. ساخت کاربر CephX (`client.app1`) فقط مرور `05 - Cephx` بود؛ اینجا تکرار نمی‌شود.
 
-**MGR** فرآیند مدیریت کلاستر است (در `ceph -s` خط `mgr:`). پلاگین‌ها داخل همین فرآیند اجرا می‌شوند؛ Dashboard یکی از آن ماژول‌هاست (`ceph-mgr-dashboard`)، نه daemon چهارمی مثل MON/OSD/MDS. تا MGR active و ماژول enable نباشد، پورت ۸۴۴۳ چیزی گوش نمی‌دهد.
+**فرآیند MGR** مدیریت کلاستر است (در `ceph -s` خط `mgr:`). پلاگین‌ها داخل همین فرآیند اجرا می‌شوند؛ Dashboard یکی از آن ماژول‌هاست (`ceph-mgr-dashboard`)، نه daemon چهارمی مثل MON/OSD/MDS. تا MGR active و ماژول enable نباشد، پورت ۸۴۴۳ چیزی گوش نمی‌دهد.
 
 چهار ابزار جدا که اسم‌شان شبیه هم است:
 
@@ -17,7 +17,7 @@ Hardware این جلسه در پوشهٔ `11 - Hardware` است. ساخت کار
 | **Alertmanager** | روی متریک آلارم می‌فرستد | ۹۰۹۳ |
 | **Ceph Dashboard** | UI مدیریت کلاستر (Pool، OSD، کاربر) | ۸۴۴۳ |
 
-Grafana داخل Dashboard «embedded» می‌شود؛ خود Dashboard نیست. URL هر کدام را باید جدا به Dashboard بدهید.
+نمودارهای **Grafana** داخل Dashboard «embedded» می‌شود؛ خود Dashboard نیست. URL هر کدام را باید جدا به Dashboard بدهید.
 
 ## وضعیت کلاستر قبل از کار
 
@@ -47,7 +47,7 @@ cluster:
 
 ## Containerهای مانیتورینگ
 
-`docker ps` روی `ceph-node1`:
+خروجی `docker ps` روی `ceph-node1`:
 
 ```text
 grafana/grafana:5.4.3          grafana-server
@@ -56,7 +56,7 @@ prom/alertmanager:v0.16.2      alertmanager
 prom/node-exporter:v0.17.0     node-exporter
 ```
 
-Grafana از قبل روی پورت ۳۰۰۰ باز بود:
+سرویس **Grafana** از قبل روی پورت ۳۰۰۰ باز بود:
 
 ```text
 http://192.168.1.15:3000

@@ -6,7 +6,7 @@
 
 ## نسبت SSD یا NVMe به OSD داده
 
-HDD در نوشتن‌های کوچک (journal / WAL) کند است. Ceph نوشتن را اول روی فلش سریع ثبت می‌کند (**WAL** = write-ahead log، **DB** = RocksDB متادیتای BlueStore؛ در FileStore قدیمی به آن journal می‌گفتند)، بعد به‌صورت پشت‌سرهم روی HDD می‌ریزد. فلش را بین چند OSD HDD شریک می‌کنید تا هزینه پایین بماند.
+دیسک **HDD** در نوشتن‌های کوچک (journal / WAL) کند است. Ceph نوشتن را اول روی فلش سریع ثبت می‌کند (**WAL** = write-ahead log، **DB** = RocksDB متادیتای BlueStore؛ در FileStore قدیمی به آن journal می‌گفتند)، بعد به‌صورت پشت‌سرهم روی HDD می‌ریزد. فلش را بین چند OSD HDD شریک می‌کنید تا هزینه پایین بماند.
 
 اسلاید Disk:
 
@@ -33,7 +33,7 @@ PCIe / NVMe   →  نسبت 1:12 تا 1:18  (بسته به کارایی فلش)
 
 سؤال کلاس: آیا OSD را روی LUN سن می‌گذارند؟ بحث **DAS** در برابر SAN بود.
 
-Ceph خودش replication می‌کند (`size=3`). اگر OSD را روی LUN پشت RAID/SAN بگذارید، دو لایه کپی دارید، کنترلر خرابی دیسک را از Ceph پنهان می‌کند، و CRUSH نمی‌داند Failure Domain واقعی کجاست. مدل رایج: دیسک محلی (**DAS** / JBOD / HBA passthrough) تا هر OSD یک دیسک فیزیکی باشد. جزئیات CRUSH در پوشهٔ `01 - Concepts` است.
+خود **Ceph** replication می‌کند (`size=3`). اگر OSD را روی LUN پشت RAID/SAN بگذارید، دو لایه کپی دارید، کنترلر خرابی دیسک را از Ceph پنهان می‌کند، و CRUSH نمی‌داند Failure Domain واقعی کجاست. مدل رایج: دیسک محلی (**DAS** / JBOD / HBA passthrough) تا هر OSD یک دیسک فیزیکی باشد. جزئیات CRUSH در پوشهٔ `01 - Concepts` است.
 
 ## مثال شاسی SuperMicro
 

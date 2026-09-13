@@ -30,7 +30,7 @@ rbd_store_chunk_size = 8
 
 کامنت فایل می‌گوید `default_store` از Rocky به بعد deprecated است و باید به `enabled_backends` برود؛ در این لاب هنوز همان کلید قدیمی کار کرد.
 
-`rbd_store_chunk_size = 8` یعنی objectهای ۸ MiB (با `rbd info` هم `order 23 (8 MiB objects)` دیده شد).
+مقدار `rbd_store_chunk_size = 8` یعنی objectهای ۸ MiB (با `rbd info` هم `order 23 (8 MiB objects)` دیده شد).
 
 ## ۲. ری‌استارت سرویس
 
@@ -73,7 +73,7 @@ http://download.cirros-cloud.net/0.6.1/cirros-0.6.1-x86_64-disk.img
 
 ## ۴. ساخت image — چند دستور اشتباه
 
-CLI قدیمی Glance:
+خط فرمان قدیمی Glance:
 
 ```bash
 glance image-create --name cirros-app1 --is-public true \
@@ -98,7 +98,7 @@ glance: error: argument <subcommand>: invalid choice: 'image'
 
 ساب‌کامند درست `image-create` یا `image-list` است.
 
-CLI جدید OpenStack در چت:
+خط فرمان جدید OpenStack در چت:
 
 ```bash
 openstack image create --file <path> --disk-format qcow2 \
@@ -157,13 +157,13 @@ rbd ls images
 
 یعنی Glance واقعاً روی RADOS نوشته، نه فقط در دیتابیس Glance. UUID نام Image در Pool `images` همان id رکورد Glance است؛ `rbd info` ثابت می‌کند بایت‌ها objectهای RBD هستند (chunk ۸ MiB از `rbd_store_chunk_size`).
 
-Horizon (`hoodadcloud.ir`) image `cirros-app1` را با Disk Format QCOW2 و Container BARE نشان داد. صفحهٔ Key Pairs خالی بود.
+رابط **Horizon** (`hoodadcloud.ir`) image `cirros-app1` را با Disk Format QCOW2 و Container BARE نشان داد. صفحهٔ Key Pairs خالی بود.
 
 یک‌بار `cephadm shell` روی `ceph-1` با KeyboardInterrupt قطع شد؛ traceback مال لغو دستی است، نه خطای کلاستر.
 
 ## ۶. `nova boot` تا ته نرفت
 
-CLI `nova` deprecated است؛ ترجیح با `openstack server create` است. در لاب:
+دستور `nova` دیگر توصیه نمی‌شود؛ ترجیح با `openstack server create` است. در لاب:
 
 ```bash
 nova boot --flavor tiny --image 1389a02e-4b7f-4806-9fcd-f5fe70a4e107 vm1
@@ -183,8 +183,8 @@ error: unrecognized arguments: --network internal_network
 
 ## ۷. ephemeral در برابر volume
 
-- **Ephemeral** (Nova → Pool `vms`): دیسک با خود VM زندگی می‌کند؛ حذف اینستنس یعنی حذف دیسک.
-- **Volume** (Cinder → Pool `volumes`): دیسک جداست؛ می‌توان VM را پاک کرد و volume را به VM بعدی attach کرد.
+- دیسک **Ephemeral** (Nova → Pool `vms`): دیسک با خود VM زندگی می‌کند؛ حذف اینستنس یعنی حذف دیسک.
+- دیسک **Volume** (Cinder → Pool `volumes`): دیسک جداست؛ می‌توان VM را پاک کرد و volume را به VM بعدی attach کرد.
 
 در چت: اگر فقط Nova باشد و Cinder نباشد، دیسک VM از نظر کاربر ephemeral است و با حذف اینستنس می‌رود. برای دیسک ماندگار باید Cinder به Pool `volumes` وصل شود (secret و `client.cinder` همین جلسه‌اند؛ کانفیگ `cinder.conf` روی صفحه کامل دیده نشد).
 </div>

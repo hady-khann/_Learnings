@@ -6,7 +6,7 @@
 
 این نودهای جدید **عضو کلاستر `ceph` نیستند**. اگر `ceph-node5` را به Inventory همان سایت Active اضافه کنید، فقط OSD بیشتری برای همان FSID می‌سازید — باز هم یک سایت. برای DR باید کلاستر دومی با MON/OSD و FSID مال خودش بالا بیاید.
 
-**FSID** شناسهٔ یکتای کلاستر است (در `ceph -s` فیلد `cluster id`). دو کلاستر هرگز نباید FSID یکسان داشته باشند. **نام Cluster** (`ceph` در برابر `backup`) اسم فایل‌های `/etc/ceph/<name>.conf` است تا CLI بداند به کدام کلاستر حرف بزند.
+شناسهٔ **FSID** همان شناسهٔ یکتای کلاستر است (در `ceph -s` فیلد `cluster id`). دو کلاستر هرگز نباید FSID یکسان داشته باشند. **نام Cluster** (`ceph` در برابر `backup`) اسم فایل‌های `/etc/ceph/<name>.conf` است تا CLI بداند به کدام کلاستر حرف بزند.
 
 ## ۱. Inventory کلاستر Active (مرجع)
 
@@ -32,7 +32,7 @@ client-node1
 
 ## ۲. Inventory کلاستر Disaster
 
-Inventory جدا یعنی Ansible روی مجموعهٔ نود دیگری Playbook را اجرا می‌کند و کلاستر جدیدی می‌سازد، نه اینکه نود به quorum قبلی بپیوندد.
+فهرست **Inventory** جدا یعنی Ansible روی مجموعهٔ نود دیگری Playbook را اجرا می‌کند و کلاستر جدیدی می‌سازد، نه اینکه نود به quorum قبلی بپیوندد.
 
 روی `ceph-node5` همین ساختار برای سایت Passive:
 
@@ -51,7 +51,7 @@ ceph-node7
 ceph-node5
 ```
 
-Inventory یک فایل است، نه دایرکتوری:
+فایل **Inventory** یک فایل است، نه دایرکتوری:
 
 ```bash
 cat /etc/ansible/hosts
@@ -125,7 +125,7 @@ services:
   osd: 9 osds: 9 up, 9 in
 ```
 
-`HEALTH_WARN` در ویدیو به‌خاطر مواردی مثل `insecure global_id reclaim` و clock skew روی `mon.ceph-node6` / `mon.ceph-node7` بود؛ برای ادامهٔ کار mirroring الزاماً مانع نیست.
+هشدار `HEALTH_WARN` در ویدیو به‌خاطر مواردی مثل `insecure global_id reclaim` و clock skew روی `mon.ceph-node6` / `mon.ceph-node7` بود؛ برای ادامهٔ کار mirroring الزاماً مانع نیست.
 
 ## ۶. دسترسی SSH بین دو سایت
 

@@ -84,7 +84,7 @@ rbdmap
 
 ## ۴. نصب و روشن کردن daemon روی سایت Passive
 
-**`rbd-mirror` چیست؟** یک daemon جدا از MON/OSD. کارش این است که به peer وصل شود، journal Imageهای primary را بخواند، و همان نوشتن‌ها را روی Imageهای محلی **replay** کند. در مدل Active/Passive این لاب، daemon را روی سایت Passive روشن می‌کنند چون کپی باید *اینجا* ساخته شود. بدون این فرآیند، peer ثبت می‌شود ولی هیچ داده‌ای جابه‌جا نمی‌شود.
+**فرآیند `rbd-mirror` چیست؟** یک daemon جدا از MON/OSD. کارش این است که به peer وصل شود، journal Imageهای primary را بخواند، و همان نوشتن‌ها را روی Imageهای محلی **replay** کند. در مدل Active/Passive این لاب، daemon را روی سایت Passive روشن می‌کنند چون کپی باید *اینجا* ساخته شود. بدون این فرآیند، peer ثبت می‌شود ولی هیچ داده‌ای جابه‌جا نمی‌شود.
 
 روی `ceph-node5`:
 
@@ -126,10 +126,10 @@ rbd: mirroring is already configured for pool mode
 
 ## ۶. اضافه کردن Peer
 
-**Peer چیست؟** کلاستر دوری که این Pool با آن replicate می‌شود. دو کلاستر Ceph همدیگر را نمی‌شناسند تا شما صریحاً طرف مقابل را ثبت کنید.
+**همتا (Peer) چیست؟** کلاستر دوری که این Pool با آن replicate می‌شود. دو کلاستر Ceph همدیگر را نمی‌شناسند تا شما صریحاً طرف مقابل را ثبت کنید.
 
-- `rbd mirror pool enable` فقط می‌گوید این Pool *اجازه* دارد mirror شود (مثل `git init`).
-- `rbd mirror pool peer add` می‌گوید *به کجا* وصل شو (مثل `git remote add`). بدون peer، daemon `rbd-mirror` مبدأیی برای pull ندارد.
+- دستور `rbd mirror pool enable` فقط می‌گوید این Pool *اجازه* دارد mirror شود (مثل `git init`).
+- دستور `rbd mirror pool peer add` می‌گوید *به کجا* وصل شو (مثل `git remote add`). بدون peer، daemon `rbd-mirror` مبدأیی برای pull ندارد.
 
 شکل `client.local@ceph` یعنی: با کاربر CephX به نام `client.local` به کلاستری که نامش `ceph` است وصل شو. سمت چپ هویت است، سمت راست نام Cluster سایت Active — نه hostname نود.
 
@@ -204,9 +204,9 @@ rbd-image-app2
 
 ## ۸. وضعیت Mirror
 
-**replay** یعنی daemon journal سایت Active را می‌خواند و همان نوشتن‌ها را روی کپی محلی اجرا می‌کند. `starting replay` یعنی کار شروع شده؛ `up+replaying` یعنی daemon زنده است و همگام‌سازی ادامه دارد. `up` = فرآیند بالاست، `replaying` = در حال اعمال journal.
+**بازپخش (replay) یعنی** daemon journal سایت Active را می‌خواند و همان نوشتن‌ها را روی کپی محلی اجرا می‌کند. `starting replay` یعنی کار شروع شده؛ `up+replaying` یعنی daemon زنده است و همگام‌سازی ادامه دارد. `up` = فرآیند بالاست، `replaying` = در حال اعمال journal.
 
-Image سمت Active **primary** است (قابل نوشتن). کپی سمت Passive **non-primary** است؛ کلاینت نباید مستقیم روی آن بنویسد.
+نسخهٔ Image سمت Active **primary** است (قابل نوشتن). کپی سمت Passive **non-primary** است؛ کلاینت نباید مستقیم روی آن بنویسد.
 
 روی سایت Passive:
 
