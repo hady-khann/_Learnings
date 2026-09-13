@@ -4,6 +4,10 @@
 
 کلاستر Passive روی نودهای `ceph-node5` تا `ceph-node7` با همان `ceph-ansible` کلاستر اصلی ساخته می‌شود؛ فقط Inventory و نام Cluster فرق دارد.
 
+این نودهای جدید **عضو کلاستر `ceph` نیستند**. اگر `ceph-node5` را به Inventory همان سایت Active اضافه کنید، فقط OSD بیشتری برای همان FSID می‌سازید — باز هم یک سایت. برای DR باید کلاستر دومی با MON/OSD و FSID مال خودش بالا بیاید.
+
+**FSID** شناسهٔ یکتای کلاستر است (در `ceph -s` فیلد `cluster id`). دو کلاستر هرگز نباید FSID یکسان داشته باشند. **نام Cluster** (`ceph` در برابر `backup`) اسم فایل‌های `/etc/ceph/<name>.conf` است تا CLI بداند به کدام کلاستر حرف بزند.
+
 ## ۱. Inventory کلاستر Active (مرجع)
 
 روی `ceph-node1` فایل Ansible hosts چیزی شبیه این است:
@@ -27,6 +31,8 @@ client-node1
 ```
 
 ## ۲. Inventory کلاستر Disaster
+
+Inventory جدا یعنی Ansible روی مجموعهٔ نود دیگری Playbook را اجرا می‌کند و کلاستر جدیدی می‌سازد، نه اینکه نود به quorum قبلی بپیوندد.
 
 روی `ceph-node5` همین ساختار برای سایت Passive:
 
@@ -62,6 +68,8 @@ cd /etc/ansible/hosts
 ```
 
 ## ۳. نام Cluster = backup
+
+اگر هر دو سایت اسم `ceph` داشته باشند، فایل `ceph.conf` و keyring روی نودی که به هر دو وصل است قاطی می‌شود. اسم `backup` یعنی فایل‌ها `backup.conf` / `backup.client.admin.keyring` می‌شوند و دستورها با `--cluster backup` به سایت Passive می‌روند.
 
 در `group_vars/all.yml` کلاستر disaster، مقدار `cluster` را از پیش‌فرض `ceph` به `backup` تغییر دهید:
 

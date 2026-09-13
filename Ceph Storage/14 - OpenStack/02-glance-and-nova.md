@@ -155,7 +155,7 @@ rbd ls images
 1389a02e-4b7f-4806-9fcd-f5fe70a4e107
 ```
 
-یعنی Glance واقعاً روی RADOS نوشته، نه فقط در دیتابیس Glance.
+یعنی Glance واقعاً روی RADOS نوشته، نه فقط در دیتابیس Glance. UUID نام Image در Pool `images` همان id رکورد Glance است؛ `rbd info` ثابت می‌کند بایت‌ها objectهای RBD هستند (chunk ۸ MiB از `rbd_store_chunk_size`).
 
 Horizon (`hoodadcloud.ir`) image `cirros-app1` را با Disk Format QCOW2 و Container BARE نشان داد. صفحهٔ Key Pairs خالی بود.
 
@@ -182,6 +182,9 @@ error: unrecognized arguments: --network internal_network
 نسخهٔ این CLI شبکه را با `--nic net-id=<uuid>` می‌گیرد، نه `--network`. VM در این جلسه ساخته نشد.
 
 ## ۷. ephemeral در برابر volume
+
+- **Ephemeral** (Nova → Pool `vms`): دیسک با خود VM زندگی می‌کند؛ حذف اینستنس یعنی حذف دیسک.
+- **Volume** (Cinder → Pool `volumes`): دیسک جداست؛ می‌توان VM را پاک کرد و volume را به VM بعدی attach کرد.
 
 در چت: اگر فقط Nova باشد و Cinder نباشد، دیسک VM از نظر کاربر ephemeral است و با حذف اینستنس می‌رود. برای دیسک ماندگار باید Cinder به Pool `volumes` وصل شود (secret و `client.cinder` همین جلسه‌اند؛ کانفیگ `cinder.conf` روی صفحه کامل دیده نشد).
 </div>

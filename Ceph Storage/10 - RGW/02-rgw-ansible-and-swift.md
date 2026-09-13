@@ -69,6 +69,8 @@ ceph osd pool ls
 
 ## ۳. ساخت کاربر Object — ترتیب مهم است
 
+**user** حساب اصلی Object است (uid، معمولاً کلید S3). **subuser** هویت وابسته برای Swift است؛ شکل `rgw-user-app1:swift` یعنی «حساب Swift آویزان به همان uid». بدون user، subuser جایی برای وصل شدن ندارد — برای همین اول `user create`، بعد `subuser create`.
+
 اول **user**، بعد **subuser**. در لاب اول `subuser create` زدند و این خطا آمد:
 
 ```text
@@ -77,7 +79,7 @@ could not create subuser: unable to parse request, user info was not populated
 
 یعنی `uid=rgw-user-app1` هنوز وجود ندارد.
 
-روی `rgw-node1`:
+روی `rgw-node1` دستور ادمین را با هویت daemon RGW بزنید (`-k` فایل keyring، `--name` همان `client.rgw.…`). این کلید CephX است تا Gateway به کلاستر حرف بزند؛ با access/secret کاربر Object فرق دارد.
 
 ```bash
 radosgw-admin user create \
@@ -125,6 +127,14 @@ auth: error reading file: ... (21) Is a directory
 ## ۴. تست Swift از کلاینت
 
 روی `client-node1` (ابزار `swift` باید نصب باشد):
+
+پرچم‌های CLI:
+
+| پرچم | معنی |
+|---|---|
+| `-A` | URL احراز هویت (`/auth/1.0`) — Swift اول کلید را اینجا چک می‌کند |
+| `-U` | نام subuser (`rgw-user-app1:swift`) |
+| `-K` | secret همان subuser (از `swift_keys` در JSON) |
 
 لیست containerها (اول خالی است؛ ممکن است usage کامل چاپ شود):
 

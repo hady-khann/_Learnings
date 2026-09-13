@@ -14,6 +14,15 @@
 
 ## ۱. ساخت کاربر روی کلاستر Disaster
 
+دو کلاستر به‌صورت پیش‌فرض به هم اعتماد ندارند. برای mirror، هر سایت یک کاربر CephX مخصوص ارتباط بین‌سایتی می‌سازد:
+
+| کاربر | ساخته‌شده روی | نقش |
+|---|---|---|
+| `client.remote` | کلاستر `backup` (Passive) | هویت daemon `rbd-mirror` روی سایت DR |
+| `client.local` | کلاستر `ceph` (Active) | هویتی که سایت Passive با آن به Active وصل می‌شود |
+
+بدون این کلیدها، daemon نمی‌تواند journal را از سایت مقابل بخواند.
+
 روی `ceph-node5`:
 
 ```bash
@@ -51,7 +60,7 @@ ceph auth get-or-create client.local \
 
 ## ۳. جابه‌جا کردن conf و keyring بین دو سایت
 
-هر سایت باید conf و کلید سایت مقابل را داشته باشد.
+هر سایت باید conf و کلید سایت مقابل را داشته باشد. `ceph.conf` / `backup.conf` آدرس MONها را می‌گوید؛ keyring ثابت می‌کند شما همان کاربر هستید. اگر فقط کلید را بفرستید و conf نرود، CLI نمی‌داند MON سایت مقابل کجاست. جهت هر دو طرف لازم است چون بعداً ممکن است از Active هم به Passive دستور بزنید (و برعکس).
 
 از primary به disaster:
 
@@ -74,6 +83,8 @@ rbdmap
 ```
 
 ## ۴. نصب و روشن کردن daemon روی سایت Passive
+
+**`rbd-mirror` چیست؟** یک daemon جدا از MON/OSD. کارش این است که به peer وصل شود، journal Imageهای primary را بخواند، و همان نوشتن‌ها را روی Imageهای محلی **replay** کند. در مدل Active/Passive این لاب، daemon را روی سایت Passive روشن می‌کنند چون کپی باید *اینجا* ساخته شود. بدون این فرآیند، peer ثبت می‌شود ولی هیچ داده‌ای جابه‌جا نمی‌شود.
 
 روی `ceph-node5`:
 
@@ -99,6 +110,8 @@ systemctl status ceph-rbd-mirror@remote.service
 
 ## ۵. Enable کردن mirroring روی Pool
 
+این دستور فقط پرچم Pool را روشن می‌کند: «Imageهای این Pool *می‌توانند* mirror شوند.» هنوز نمی‌گوید سایت مقابل کیست. باید روی **هر دو** کلاستر اجرا شود تا هر دو طرف نقش mirror را بپذیرند؛ وگرنه یک سمت Image می‌سازد و سمت دیگر replica را قبول نمی‌کند.
+
 روی **هر دو** کلاستر، برای Pool `rbd-pool-app1` و در حالت pool:
 
 ```bash
@@ -112,6 +125,17 @@ rbd: mirroring is already configured for pool mode
 ```
 
 ## ۶. اضافه کردن Peer
+
+**Peer چیست؟** کلاستر دوری که این Pool با آن replicate می‌شود. دو کلاستر Ceph همدیگر را نمی‌شناسند تا شما صریحاً طرف مقابل را ثبت کنید.
+
+- `rbd mirror pool enable` فقط می‌گوید این Pool *اجازه* دارد mirror شود (مثل `git init`).
+- `rbd mirror pool peer add` می‌گوید *به کجا* وصل شو (مثل `git remote add`). بدون peer، daemon `rbd-mirror` مبدأیی برای pull ندارد.
+
+شکل `client.local@ceph` یعنی: با کاربر CephX به نام `client.local` به کلاستری که نامش `ceph` است وصل شو. سمت چپ هویت است، سمت راست نام Cluster سایت Active — نه hostname نود.
+
+خروجی یک **UUID** است؛ شناسهٔ همین peer در تنظیمات Pool. برای حذف بعدی (`peer remove`) همین UUID لازم است، نه اسم `ceph`.
+
+در خروجی `pool info`، `Direction: rx-tx` یعنی لینک *می‌تواند* داده بفرستد و بگیرد. در این لاب مدل Active/Passive است: نوشتن فقط روی Imageهای **primary** سایت Active انجام می‌شود؛ Passive replica را replay می‌کند. `rx-tx` قابلیت لینک است، نه اینکه هر دو سایت همزمان بنویسند.
 
 روی سایت Passive (`ceph-node5`)، peer را به کلاستر Active وصل کنید:
 
@@ -180,6 +204,10 @@ rbd-image-app2
 
 ## ۸. وضعیت Mirror
 
+**replay** یعنی daemon journal سایت Active را می‌خواند و همان نوشتن‌ها را روی کپی محلی اجرا می‌کند. `starting replay` یعنی کار شروع شده؛ `up+replaying` یعنی daemon زنده است و همگام‌سازی ادامه دارد. `up` = فرآیند بالاست، `replaying` = در حال اعمال journal.
+
+Image سمت Active **primary** است (قابل نوشتن). کپی سمت Passive **non-primary** است؛ کلاینت نباید مستقیم روی آن بنویسد.
+
 روی سایت Passive:
 
 ```bash
@@ -229,6 +257,8 @@ rbd-mirror: 1 daemon active
 
 ## ۹. حذف Peer (در صورت نیاز)
 
+تا وقتی peer ثبت است، Pool هنوز به سایت مقابل گره خورده. برای همین `mirror pool disable` با خطای `peers still registered` رد می‌شود: اول رابطه را قطع کنید، بعد mirroring را خاموش کنید.
+
 ```bash
 rbd mirror pool info rbd-pool-app1
 rbd mirror pool peer remove rbd-pool-app1 431f522d-dcd3-4450-804d-b845e1b70bad
@@ -241,6 +271,8 @@ peers still registered
 ```
 
 ## ۱۰. خطاهای رایج این لاب
+
+چون کپی Passive غیرقابل‌نوشتن (non-primary) است، `rbd rm` معمولی آن را پاک نمی‌کند — Ceph فرض می‌کند هنوز به primary وصل است. `force` یعنی «می‌دانم این replica است، قطعش کن»؛ اگر اشتباه روی دادهٔ زنده بزنید، mirror خراب می‌شود.
 
 حذف Image روی سایت Passive (نسخهٔ non-primary) بدون force:
 

@@ -23,6 +23,19 @@ mon_host = [v2:185.55.227.16:3300/0,v1:185.55.227.16:6789/0] [v2:185.55.227.42:3
 
 Glance و ساخت image در `02-glance-and-nova.md` است. HAProxy روی همین نود در `15 - HAProxy`.
 
+OpenStack چند سرویس جداست که اینجا به Ceph وصل می‌شوند. Keystone احراز هویت *اوپن‌استک* است، نه CephX:
+
+| سرویس | کار | ربط به Ceph در این لاب |
+|---|---|---|
+| **Horizon** | UI وب | `hoodadcloud.ir` |
+| **Keystone** | login کاربران OpenStack | جدا از `client.cinder` / `client.glance` |
+| **Glance** | کاتالوگ image ماشین مجازی | Pool `images` |
+| **Nova** | ساخت/اجرای VM | Pool `vms` (دیسک ephemeral) |
+| **Cinder** | دیسک ماندگار قابل attach | Pool `volumes` |
+| **libvirt / KVM** | hypervisor روی compute | با `virsh secret` کلید Ceph را به QEMU می‌دهد |
+
+Controller APIها را دارد؛ compute خود VM را اجرا می‌کند — برای همین `virsh` روی compute است نه controller.
+
 ## ۱. کپی `ceph.conf` به controller
 
 از `ceph-1`:
@@ -35,6 +48,14 @@ scp ceph.conf root@controller:/etc/ceph/ceph.conf
 اولین تلاش مسیر را ناقص گذاشت (`/etc/ce`)؛ باید فایل کامل مقصد را بدهید.
 
 ## ۲. ساخت Pool برای Cinder و Nova
+
+سه Pool جدا تا سهمیه، CephX و خرابی یکی، image و دیسک VM را قاطی نکند:
+
+| Pool | مصرف‌کننده |
+|---|---|
+| `images` | Glance — فایل image (از قبل در لاب وجود داشت) |
+| `volumes` | Cinder — دیسک قابل attach |
+| `vms` | Nova — دیسک ephemeral روی RBD |
 
 روی `ceph-1`:
 
@@ -136,6 +157,8 @@ Error initializing cluster client: rados_initialize failed with error code: -22
 `--name` مقدار CephX است (`client.cinder`)، نه مسیر keyring. keyring را با `-k` یا گذاشتن فایل در `/etc/ceph` بدهید.
 
 ## ۶. `secret.xml` برای libvirt
+
+QEMU روی compute باید Image RBD را مثل دیسک به VM بچسباند. برای این کار کلید Ceph (`client.cinder`) لازم است، ولی libvirt آن را از فایل keyring نمی‌خواند: یک **secret** با UUID می‌سازد و کلید را داخل آن می‌گذارد. Nova/Cinder در کانفیگ همان UUID را می‌نویسند. اگر UUID فایل `secret.xml` با UUID داخل `nova.conf` / `cinder.conf` یکی نباشد، attach شکست می‌خورد.
 
 روی **controller** در `/etc/ceph`:
 

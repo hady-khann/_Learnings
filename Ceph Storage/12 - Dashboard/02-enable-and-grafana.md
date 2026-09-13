@@ -53,6 +53,8 @@ ceph-osd
 
 ## ۲. پورت ۸۴۴۳ اول Connection refused
 
+Dashboard روی HTTPS گوش می‌دهد تا مرورگر به UI مدیریت وصل شود. `create-self-signed-cert` یک گواهی موقت می‌سازد (مرورگر warning می‌دهد؛ برای لاب کافی است). تا گواهی و bind روی `8443` نباشد، `curl http://…:8443` با Connection refused برمی‌گردد — هم به‌خاطر `http` به‌جای `https`، هم چون هنوز هیچ‌چیز به پورت bind نشده.
+
 ```bash
 docker ps
 curl http://192.168.1.15:8443
@@ -90,6 +92,8 @@ https://192.168.1.15:8443
 
 ## ۳. کاربر Dashboard (نه CephX)
 
+ورود وب با `ceph dashboard ac-user-create` ساخته می‌شود. این `admin` کاربر CephX به نام `client.admin` نیست: یکی برای مرورگر است، یکی برای CLI روی MON. نقش `administrator` فقط داخل خود UI Dashboard معنی دارد.
+
 رمز را در فایل بگذارید؛ `-i` مسیر فایل می‌خواهد:
 
 ```bash
@@ -106,6 +110,8 @@ ceph dashboard ac-user-create admin -i
 نقش آخر `administrator` است. نقش‌های دیگر در سند SUSE که در چت لینک شد آمده؛ در لاب فقط administrator ساخته شد.
 
 ## ۴. وصل Grafana / Prometheus / Alertmanager
+
+Dashboard نمودار را خودش scrape نمی‌کند؛ فقط iframe/API به Grafana می‌زند. اگر این URLها خالی باشند، صفحهٔ Monitoring/Alerts خالی می‌ماند — Grafana روی ۳۰۰۰ ممکن است سالم باشد ولی Dashboard نمی‌داند کجاست.
 
 Containerها روی همین نود بودند. دستورهای چت:
 
