@@ -106,6 +106,9 @@ Use the SSH key created in the previous step:
 
 ```bash
 sudo cephadm bootstrap --mon-ip <your-first-monitor-ip>
+
+# for secondary clusters to not use the default name of cluster 
+sudo cephadm bootstrap --mon-ip <your-first-monitor-ip> --cluster-name mycluster
 ```
 
 For example, if `ceph-node1` uses `192.168.111.101` as its monitor IP:
