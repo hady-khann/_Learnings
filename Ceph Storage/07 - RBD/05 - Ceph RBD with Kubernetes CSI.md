@@ -35,6 +35,8 @@ Ceph-CSI handles:
 * Cloning
 * Restore
 
+Important: the Ceph cluster and the Kubernetes cluster are **separate**. Kubernetes connects to Ceph over the network. Installing Ceph-CSI does not redeploy Ceph or touch an existing pool.
+
 ---
 
 # 2. Create a Ceph RBD Pool
@@ -47,7 +49,11 @@ ceph osd pool create rbd-pool-app1 50
 ceph osd pool set rbd-pool-app1 size 3
 
 ceph osd pool application enable rbd-pool-app1 rbd
+
+rbd pool init rbd-pool-app1
 ```
+
+`rbd pool init` prepares the pool for RBD use. It does not delete existing data.
 
 Check:
 
@@ -114,13 +120,171 @@ df -h
 df -Th
 ```
 
+Clean up the manual test before using the pool with Kubernetes:
+
+```bash
+umount /mnt/rbd-mount-app1
+rbd unmap /dev/rbd0
+rbd rm rbd-pool-app1/rbd-image-app1
+```
+
 This manual workflow is useful for learning RBD, but Kubernetes normally performs these operations through Ceph-CSI.
 
 ---
 
-# 4. Ceph-CSI StorageClass
+# 4. Prepare Ceph for Kubernetes
 
-A simplified RBD StorageClass:
+Run these on a Ceph admin node.
+
+## 4.1 Create a dedicated Ceph user
+
+Do not use `client.admin` for Kubernetes. Create a user limited to the pool:
+
+```bash
+ceph auth get-or-create client.kubernetes \
+  mon 'profile rbd' \
+  osd 'profile rbd pool=rbd-pool-app1' \
+  mgr 'profile rbd pool=rbd-pool-app1'
+```
+
+Get the key:
+
+```bash
+ceph auth get-key client.kubernetes
+```
+
+Store the key securely and never commit it to Git.
+
+## 4.2 Collect cluster connection details
+
+```bash
+ceph fsid
+
+ceph mon dump
+```
+
+Example (illustrative only):
+
+```text
+FSID:     12345678-1234-1234-1234-123456789abc
+MONITORS: 192.168.1.10:6789, 192.168.1.11:6789, 192.168.1.12:6789
+```
+
+If your monitors use msgr2 only, use the ports shown by `ceph mon dump` (for example `3300`) in the configuration.
+
+## 4.3 Network requirements
+
+Every Kubernetes worker node that may mount a volume must reach:
+
+* All Ceph monitors (ports 3300 and/or 6789)
+* All OSDs (ports 6800–7300)
+
+Test from a worker node:
+
+```bash
+nc -zv <MONITOR_IP> 6789
+```
+
+Worker nodes also need the `rbd` kernel module available:
+
+```bash
+modprobe rbd
+lsmod | grep rbd
+```
+
+---
+
+# 5. Install Ceph-CSI in Kubernetes
+
+Check whether a driver is already installed:
+
+```bash
+kubectl get csidrivers
+
+kubectl get pods -A | grep -i ceph
+
+helm list -A | grep -i ceph
+```
+
+If `rbd.csi.ceph.com` already exists and its Pods are healthy, skip the install.
+
+## 5.1 Prerequisite for snapshots
+
+VolumeSnapshots need the snapshot CRDs and the snapshot controller. Check:
+
+```bash
+kubectl get crd | grep snapshot.storage.k8s.io
+
+kubectl get pods -A | grep snapshot-controller
+```
+
+If they are missing, install them from the `kubernetes-csi/external-snapshotter` project (many distributions already include them).
+
+## 5.2 Install with Helm
+
+Create a `values.yaml`:
+
+```yaml
+csiConfig:
+  - clusterID: "<YOUR_CEPH_FSID>"
+    monitors:
+      - "<MONITOR_1_IP>:6789"
+      - "<MONITOR_2_IP>:6789"
+      - "<MONITOR_3_IP>:6789"
+```
+
+Install:
+
+```bash
+helm repo add ceph-csi https://ceph.github.io/csi-charts
+
+helm repo update
+
+helm install ceph-csi-rbd ceph-csi/ceph-csi-rbd \
+  --namespace ceph-csi-rbd \
+  --create-namespace \
+  -f values.yaml
+```
+
+Check:
+
+```bash
+kubectl -n ceph-csi-rbd get pods
+
+kubectl get csidrivers
+```
+
+Expected: a `provisioner` Deployment, a `nodeplugin` DaemonSet (one Pod per node), and the `rbd.csi.ceph.com` CSIDriver object.
+
+## 5.3 Alternative: Ceph-CSI Operator
+
+The Ceph-CSI Operator is the newer way to manage the driver and is documented upstream. Its resources differ (`Driver`, `ClientProfile`, and others), and when using it the StorageClass `clusterID` must match the configured **ClientProfile name** instead of the Ceph FSID. Check the operator's documentation for your Kubernetes version before choosing it. The rest of this guide uses the Helm install, where `clusterID` is the Ceph FSID.
+
+---
+
+# 6. Create the Secret
+
+The Secret holds the Ceph user and key. Create it in the same namespace used in the StorageClass:
+
+```bash
+kubectl -n ceph-csi-rbd create secret generic csi-rbd-secret \
+  --from-literal=userID=kubernetes \
+  --from-literal=userKey='<YOUR_CEPH_CLIENT_KEY>'
+```
+
+Check:
+
+```bash
+kubectl -n ceph-csi-rbd get secret csi-rbd-secret
+```
+
+Note: `userID` is `kubernetes`, **without** the `client.` prefix.
+
+---
+
+# 7. Ceph-CSI StorageClass
+
+A complete RBD StorageClass:
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -132,10 +296,19 @@ metadata:
 provisioner: rbd.csi.ceph.com
 
 parameters:
-  clusterID: <CEPH_CLUSTER_ID>
+  clusterID: "<YOUR_CEPH_FSID>"
   pool: rbd-pool-app1
 
   imageFeatures: layering
+
+  csi.storage.k8s.io/provisioner-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: ceph-csi-rbd
+  csi.storage.k8s.io/controller-expand-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/controller-expand-secret-namespace: ceph-csi-rbd
+  csi.storage.k8s.io/node-stage-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: ceph-csi-rbd
+
+  csi.storage.k8s.io/fstype: ext4
 
 reclaimPolicy: Delete
 
@@ -144,17 +317,37 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 ```
 
+Apply:
+
+```bash
+kubectl apply -f storageclass.yaml
+
+kubectl get storageclass
+```
+
+Key options:
+
+| Option | Meaning |
+| --- | --- |
+| `clusterID` | Must match an entry in the Ceph-CSI config (`csiConfig`) |
+| `pool` | The Ceph pool where RBD images are created |
+| `imageFeatures` | `layering` is the safe default for kernel-mapped images |
+| `*-secret-*` | Credentials used for provisioning, expanding and mounting |
+| `fstype` | Filesystem created on the RBD (`ext4` or `xfs`) |
+| `reclaimPolicy` | `Delete` removes the RBD image with the PV; `Retain` keeps it |
+| `allowVolumeExpansion` | Required for PVC resize |
+
 The important option for resize is:
 
 ```yaml
 allowVolumeExpansion: true
 ```
 
-In a real environment, the StorageClass also needs the appropriate Ceph-CSI authentication/secret configuration.
+For production, consider `reclaimPolicy: Retain` and `volumeBindingMode: WaitForFirstConsumer`.
 
 ---
 
-# 5. Create a PVC
+# 8. Create a PVC
 
 Example:
 
@@ -195,9 +388,17 @@ NAME        STATUS   VOLUME     CAPACITY
 app1-pvc    Bound    pvc-xxxx   10Gi
 ```
 
+Confirm on the Ceph side:
+
+```bash
+rbd ls -p rbd-pool-app1
+```
+
+You should see an image named like `csi-vol-<uuid>`.
+
 ---
 
-# 6. Use the PVC from a Pod
+# 9. Use the PVC from a Pod
 
 Example Pod:
 
@@ -241,9 +442,22 @@ Check the filesystem:
 kubectl exec -it app1 -- df -h
 ```
 
+Test persistence:
+
+```bash
+kubectl exec app1 -- sh -c 'echo "hello ceph" > /data/test.txt'
+
+kubectl delete pod app1
+kubectl apply -f pod.yaml
+
+kubectl exec app1 -- cat /data/test.txt
+```
+
+The file should still be there after the Pod is recreated.
+
 ---
 
-# 7. Resize the RBD Volume
+# 10. Resize the RBD Volume
 
 Assume:
 
@@ -285,11 +499,22 @@ Check:
 kubectl get pvc app1-pvc
 ```
 
+Look at the PVC conditions if the size does not change:
+
+```bash
+kubectl describe pvc app1-pvc
+```
+
 Then check from the Pod:
 
 ```bash
 kubectl exec -it app1 -- df -h
 ```
+
+Notes:
+
+* Volumes can only be **grown**, never shrunk.
+* RBD volumes support online expansion; the filesystem is grown automatically while the Pod is running (a Pod restart may be needed on some older versions).
 
 The expected flow is:
 
@@ -307,7 +532,7 @@ Filesystem 15Gi
 
 ---
 
-# 8. Direct RBD Resize vs Kubernetes Resize
+# 11. Direct RBD Resize vs Kubernetes Resize
 
 ### Direct RBD
 
@@ -337,13 +562,13 @@ kubectl patch pvc app1-pvc \
   -p '{"spec":{"resources":{"requests":{"storage":"15Gi"}}}}'
 ```
 
-Prefer the Kubernetes method when Kubernetes/CSI owns the Volume.
+Prefer the Kubernetes method when Kubernetes/CSI owns the Volume. A direct `rbd resize` leaves the PVC/PV size out of sync with the real image.
 
 ---
 
-# 9. VolumeSnapshotClass
+# 12. VolumeSnapshotClass
 
-Before creating Kubernetes VolumeSnapshots, a suitable `VolumeSnapshotClass` must exist.
+Before creating Kubernetes VolumeSnapshots, a suitable `VolumeSnapshotClass` must exist, along with the snapshot CRDs and controller (see section 5.1).
 
 Example:
 
@@ -356,20 +581,27 @@ metadata:
 
 driver: rbd.csi.ceph.com
 
+parameters:
+  clusterID: "<YOUR_CEPH_FSID>"
+  csi.storage.k8s.io/snapshotter-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/snapshotter-secret-namespace: ceph-csi-rbd
+
 deletionPolicy: Delete
 ```
 
-Check:
+Apply and check:
 
 ```bash
+kubectl apply -f snapshotclass.yaml
+
 kubectl get volumesnapshotclass
 ```
 
-The exact configuration depends on the Ceph-CSI deployment and authentication setup.
+The `clusterID` and secret must match the StorageClass configuration.
 
 ---
 
-# 10. Create a VolumeSnapshot
+# 13. Create a VolumeSnapshot
 
 Example:
 
@@ -399,6 +631,8 @@ Check:
 kubectl get volumesnapshot
 ```
 
+`READYTOUSE` should become `true`.
+
 More details:
 
 ```bash
@@ -422,7 +656,7 @@ RBD Snapshot
 
 ---
 
-# 11. Direct RBD Snapshot
+# 14. Direct RBD Snapshot
 
 If managing RBD directly:
 
@@ -441,12 +675,12 @@ Example:
 
 ```text
 SNAPID  NAME              SIZE
-1       before-upgrade   15Gi
+1       before-upgrade   15 GiB
 ```
 
 ---
 
-# 12. Restore from a Kubernetes Snapshot
+# 15. Restore from a Kubernetes Snapshot
 
 A common Kubernetes workflow is to create a **new PVC from the Snapshot**.
 
@@ -472,6 +706,8 @@ spec:
     requests:
       storage: 15Gi
 ```
+
+The requested size must be equal to or larger than the snapshot's source size.
 
 Apply:
 
@@ -502,9 +738,49 @@ New RBD Image
 
 The original RBD remains unchanged.
 
+To use the restored data, point the application (or a new Pod) at `app1-pvc-restored`.
+
 ---
 
-# 13. Direct RBD Rollback
+# 16. Clone a PVC
+
+A PVC can also be cloned directly, without creating a snapshot first:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  name: app1-pvc-clone
+
+spec:
+  storageClassName: ceph-rbd
+
+  dataSource:
+    name: app1-pvc
+    kind: PersistentVolumeClaim
+
+  accessModes:
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      storage: 15Gi
+```
+
+Apply and check:
+
+```bash
+kubectl apply -f clone-pvc.yaml
+
+kubectl get pvc
+```
+
+The clone must be in the same namespace and use the same StorageClass as the source PVC.
+
+---
+
+# 17. Direct RBD Rollback
 
 With manually managed RBD:
 
@@ -531,7 +807,7 @@ Do not casually perform direct RBD rollback on a volume that is actively being u
 
 ---
 
-# 14. Rollback vs Restore
+# 18. Rollback vs Restore
 
 ### RBD Rollback
 
@@ -563,7 +839,7 @@ For Kubernetes workloads, the second approach is generally easier to control.
 
 ---
 
-# 15. Check the RBD Backend
+# 19. Check the RBD Backend
 
 Even when Kubernetes manages the Volume, RBD commands are useful for troubleshooting.
 
@@ -585,15 +861,90 @@ List snapshots:
 rbd snap ls rbd-pool-app1/<image-name>
 ```
 
+Check which clients have an image open:
+
+```bash
+rbd status rbd-pool-app1/<image-name>
+```
+
 Check pool:
 
 ```bash
 ceph osd pool get rbd-pool-app1 size
 ```
 
+Map a PV to its RBD image:
+
+```bash
+kubectl get pv <pv-name> -o jsonpath='{.spec.csi.volumeAttributes.imageName}'
+```
+
 ---
 
-# 16. Important Kubernetes Commands
+# 20. Troubleshooting
+
+### PVC stays in `Pending`
+
+```bash
+kubectl describe pvc app1-pvc
+
+kubectl -n ceph-csi-rbd get pods
+
+kubectl -n ceph-csi-rbd logs deploy/ceph-csi-rbd-provisioner -c csi-rbdplugin
+```
+
+Common causes:
+
+* Wrong `clusterID` (does not match the `csiConfig` entry)
+* Wrong Secret name/namespace, or wrong key
+* Monitors unreachable from the provisioner Pods
+* Ceph user lacks permissions on the pool
+* Typo in the StorageClass name
+
+### Pod stuck in `ContainerCreating`
+
+```bash
+kubectl describe pod app1
+
+kubectl -n ceph-csi-rbd logs ds/ceph-csi-rbd-nodeplugin -c csi-rbdplugin
+```
+
+Common causes:
+
+* Worker node cannot reach the OSDs
+* `rbd` kernel module missing on the node
+* Image still mapped on another node (RWO volume, previous Pod not fully terminated)
+* Unsupported `imageFeatures` for the node's kernel
+
+### Resize does not complete
+
+```bash
+kubectl describe pvc app1-pvc
+```
+
+Check `allowVolumeExpansion: true`, the `controller-expand-secret-*` parameters, and the provisioner logs.
+
+### Snapshot is not `ReadyToUse`
+
+```bash
+kubectl describe volumesnapshot app1-snapshot
+
+kubectl describe volumesnapshotcontent
+```
+
+Check the snapshot controller is running, the `VolumeSnapshotClass` has the correct secret, and the `clusterID` matches.
+
+### Ceph health
+
+```bash
+ceph -s
+
+ceph health detail
+```
+
+---
+
+# 21. Important Kubernetes Commands
 
 PVC:
 
@@ -630,6 +981,13 @@ kubectl get pods
 kubectl describe pod app1
 ```
 
+CSI driver:
+
+```bash
+kubectl get csidrivers
+kubectl -n ceph-csi-rbd get pods
+```
+
 Filesystem:
 
 ```bash
@@ -638,7 +996,31 @@ kubectl exec -it app1 -- df -h
 
 ---
 
-# 17. Important Rules
+# 22. Clean Up
+
+Delete in this order:
+
+```bash
+kubectl delete pod app1
+
+kubectl delete volumesnapshot app1-snapshot
+
+kubectl delete pvc app1-pvc-restored app1-pvc-clone app1-pvc
+```
+
+With `reclaimPolicy: Delete`, deleting the PVC also deletes the PV and the RBD image. Verify:
+
+```bash
+kubectl get pv
+
+rbd ls -p rbd-pool-app1
+```
+
+With `reclaimPolicy: Retain`, the PV and RBD image stay and must be removed manually.
+
+---
+
+# 23. Important Rules
 
 ### Rule 1 — Kubernetes owns Kubernetes Volumes
 
@@ -711,7 +1093,40 @@ The filesystem exists above the RBD block device.
 
 ---
 
-# 18. Final Mental Model
+### Rule 6 — Use a dedicated Ceph user
+
+Never put `client.admin` credentials in a Kubernetes Secret. Use a user restricted to the required pool.
+
+---
+
+### Rule 7 — Do not manually edit CSI-managed images
+
+Do not rename, delete or modify `csi-vol-*` images by hand while a PV references them.
+
+---
+
+# 24. RWO vs Shared Access
+
+RBD is block storage. A normal filesystem-mode RBD volume is:
+
+```yaml
+accessModes:
+  - ReadWriteOnce
+```
+
+This means one node at a time. It is not suitable for multiple Pods on different nodes writing to the same filesystem.
+
+| Need | Use |
+| --- | --- |
+| One Pod / one node, databases, single-instance apps | RBD, `ReadWriteOnce` |
+| Many Pods sharing files (RWX) | CephFS (Ceph-CSI CephFS driver) or NFS |
+| Raw shared block device for clustered software | RBD with `volumeMode: Block` and `ReadWriteMany` (advanced, the application must handle concurrent access safely) |
+
+Multiple Pods on the **same node** can use an RWO volume, but do not rely on this for scaling.
+
+---
+
+# 25. Final Mental Model
 
 ```text
                          Kubernetes
@@ -749,6 +1164,17 @@ The filesystem exists above the RBD block device.
 The key concept is:
 
 > **RBD provides the block storage, Ceph-CSI connects it to Kubernetes, and Kubernetes manages the Volume lifecycle through PVCs and CSI APIs.**
+
+Setup order for a new cluster:
+
+1. Create and initialize the Ceph pool
+2. Create a restricted Ceph user
+3. Collect FSID and monitor addresses
+4. Install Ceph-CSI (and snapshot CRDs/controller)
+5. Create the Secret
+6. Create the StorageClass
+7. Test with a PVC and Pod
+8. Add VolumeSnapshotClass and test snapshot/restore
 
 For Kubernetes-managed RBD volumes, the most important concepts to learn are:
 
