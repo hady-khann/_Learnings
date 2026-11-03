@@ -83,6 +83,10 @@ ceph -s
 
 ```bash
 ceph orch daemon add osd ceph-node1:/dev/sdb
+
+or 
+
+ceph orch daemon add osd node2:ceph-vg4/osd-lv
 ```
 
 در این مثال فقط:
