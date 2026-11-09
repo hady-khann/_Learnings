@@ -53,43 +53,238 @@ ceph fs volume create cephfs
 
 ---
 
-## ۳. مراحل اولیه cephx
+## ۳. مراحل اولیه cephx (احراز هویت)
 
-cephx سیستم احراز هویت Ceph است. هر کاربر یک **entity** با **key** و **caps** (مجوزها) دارد.
+### ۳.۱ مفاهیم پایه
 
-دستورهای پایه:
+- **entity**: نام هر کاربر یا daemon در Ceph، مثل `client.admin`، `client.rbd-mirror.site-b` یا `osd.0`.
+- **key**: رمز (secret) آن entity.
+- **caps**: مجوزها به تفکیک سرویس‌ها (`mon`، `osd`، `mds`، `mgr`). هر کاربر فقط کاری را می‌تواند بکند که caps اجازه می‌دهد.
+- **keyring**: فایلی که entity و key را نگه می‌دارد. شکل آن:
 
-```bash
-ceph auth ls                       # فهرست همه کاربران
-ceph auth get client.admin         # دیدن key و caps یک کاربر
-ceph auth get-or-create client.x mon 'allow r' osd 'allow rw'   # ساخت کاربر
-ceph auth rm client.x              # حذف
+```
+[client.rbd-mirror.site-b]
+        key = AQxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==
 ```
 
-در CephFS mirroring دو نوع کاربر درگیر است:
+- **مهم: کاربران در دیتابیس mon های هر کلاستر ذخیره می‌شوند و هر کلاستر دیتابیس کاربران جدا دارد.** کاربری که روی `site-a` ساخته‌اید روی `site-b` وجود ندارد، و برعکس. به همین دلیل باید بدانید هر دستور را روی کدام کلاستر می‌زنید.
 
-1. **کاربر daemon روی مبدأ** (مثل `client.cephfs-mirror.<host>.<id>`): cephadm خودش می‌سازد و کار خاصی لازم نیست.
-2. **کاربر ریموت روی مقصد**: daemon مبدأ با این کاربر به کلاستر مقصد وصل می‌شود. باید ساخته شود.
+### ۳.۲ دستور `ceph auth get-or-create` را روی کدام سرور بزنم؟
 
-### ساخت کاربر ریموت روی مقصد (site-b)
+این دستور به mon های کلاستر وصل می‌شود و کاربر را همان‌جا می‌سازد. پس سروری که روی آن می‌زنید باید:
+
+1. **عضو (یا کلاینت) همان کلاستری باشد که می‌خواهید کاربر در آن ساخته شود.**
+2. فایل `/etc/ceph/ceph.conf` و یک keyring با دسترسی مدیریتی (معمولاً `/etc/ceph/ceph.client.admin.keyring`) داشته باشد.
+
+در عمل این سرور **نود ادمین/bootstrap همان کلاستر** است (معمولاً یکی از mon ها). اگر با cephadm نصب کرده‌اید:
+
+- روی نودی که label ‏`_admin` دارد (نودی که `cephadm bootstrap` را روی آن زده‌اید) وارد شوید.
+- یا دستور را از طریق `cephadm shell -- ...` اجرا کنید.
+- یا یک‌بار `cephadm install ceph-common` را روی آن نود بزنید تا دستورهای `ceph` و `rbd` را مستقیم روی خود هاست اجرا کنید.
+
+قبل از زدن هر دستور auth، مطمئن شوید روی کلاستر درست هستید:
+
+```bash
+ceph fsid          # شناسه یکتای کلاستر؛ با fsid مورد انتظار مقایسه کنید
+ceph -s            # نام و وضعیت mon ها را ببینید
+hostname
+```
+
+### ۳.۳ ساخت کاربر
+
+قالب کلی:
+
+```bash
+ceph auth get-or-create <entity> <service1> '<caps>' <service2> '<caps>' ... [-o <فایل-keyring>]
+```
+
+- `get-or-create`: اگر کاربر وجود نداشت می‌سازد؛ اگر وجود داشت و caps یکسان بود، همان را برمی‌گرداند؛ اگر caps فرق داشت **خطا می‌دهد** (برای تغییر caps از `ceph auth caps` استفاده کنید).
+- `-o <فایل>`: خروجی (keyring) را در یک فایل روی **همان سروری که دستور را زده‌اید** ذخیره می‌کند. بدون `-o` فقط روی صفحه چاپ می‌شود.
+
+**نکته مهم درباره cephadm shell:** اگر وارد `cephadm shell` تعاملی شوید و با `-o` فایل بسازید، فایل **داخل کانتینر** می‌ماند و با خروج از شل از بین می‌رود. دو راه امن:
+
+```bash
+# راه ۱: خروجی را با ریدایرکت روی خود هاست بگیرید
+cephadm shell -- ceph auth get-or-create client.x mon 'allow r' osd 'allow rw' > /root/ceph.client.x.keyring
+
+# راه ۲: ceph-common را روی هاست نصب کنید و دستور را مستقیم بزنید
+cephadm install ceph-common
+ceph auth get-or-create client.x mon 'allow r' osd 'allow rw' -o /root/ceph.client.x.keyring
+```
+
+(راه ۱ پیام‌های اطلاعاتی cephadm را روی stderr می‌نویسد و فایل فقط خروجی دستور را دارد.)
+
+### ۳.۴ دستورهای مدیریتی
+
+```bash
+ceph auth ls                          # فهرست همه کاربران
+ceph auth get client.x                # دیدن key و caps (به شکل keyring)
+ceph auth print-key client.x          # فقط چاپ key
+ceph auth caps client.x mon 'allow r' osd 'allow rw'   # تغییر caps
+ceph auth export client.x > file      # خروجی گرفتن
+ceph auth import -i file              # وارد کردن
+ceph auth rm client.x                 # حذف
+```
+
+> `ceph auth caps` **همه caps قبلی را جایگزین می‌کند**. اگر فقط یک سرویس را تغییر می‌دهید، caps بقیه را هم دوباره بنویسید.
+
+### ۳.۵ قراردادن keyring روی سرور مصرف‌کننده
+
+سروری که daemon یا ابزار روی آن اجرا می‌شود باید دو چیز داشته باشد: `ceph.conf` همان کلاستر و keyring آن کاربر. مسیر پیش‌فرضی که Ceph خودکار می‌خواند:
+
+```
+/etc/ceph/<نام-کلاستر>.<entity>.keyring
+مثال: /etc/ceph/ceph.client.rbd-mirror.site-b.keyring
+```
+
+بعد از قرار دادن فایل:
+
+```bash
+chmod 600 /etc/ceph/ceph.client.rbd-mirror.site-b.keyring
+chown ceph:ceph /etc/ceph/ceph.client.rbd-mirror.site-b.keyring   # اگر daemon با کاربر ceph (بدون cephadm) اجرا می‌شود
+```
+
+تست اینکه کاربر درست کار می‌کند (بدون پیشوند `client.` در `--id`):
+
+```bash
+ceph -s --id rbd-mirror.site-b
+# یا با مشخص‌کردن صریح
+ceph -s --name client.rbd-mirror.site-b --keyring /etc/ceph/ceph.client.rbd-mirror.site-b.keyring
+```
+
+### ۳.۶ انتقال امن فایل بین سرورها
+
+- هر چیزی که شامل key یا token باشد مثل **رمز** است. از چت، ایمیل یا پیام‌رسان نفرستید.
+- انتقال با `scp` (یا `rsync -e ssh`):
+
+```bash
+scp /root/فایل root@<IP-سرور-مقصد>:/root/فایل
+```
+
+- روی مقصد بلافاصله دسترسی را محدود کنید: `chmod 600 /root/فایل`.
+- بعد از استفاده، فایل token را از **هر دو** سرور حذف کنید: `shred -u /root/فایل`.
+
+### ۳.۷ اشتباهات رایج
+
+| اشتباه | نتیجه |
+|---|---|
+| زدن دستور روی کلاستر اشتباه | کاربر در کلاستر دیگری ساخته می‌شود و daemon خطای auth می‌دهد |
+| `ceph auth caps` بدون نوشتن همه سرویس‌ها | بعضی caps حذف می‌شوند |
+| ساخت فایل داخل `cephadm shell` تعاملی | فایل بعد از خروج از بین می‌رود |
+| فراموش‌کردن `chmod 600` / `chown ceph:ceph` | هشدار دسترسی یا نبود امکان خواندن keyring توسط daemon |
+| کپی keyring بین دو کلاستر | کار نمی‌کند، چون کاربر در کلاستر دوم تعریف نشده؛ peering با token انجام می‌شود |
+
+### ۳.۸ کاربران cephx در CephFS mirroring
+
+| کاربر | روی کدام کلاستر | چه کسی می‌سازد | کاربرد |
+|---|---|---|---|
+| `client.admin` | هر دو | هنگام نصب | اجرای دستورهای `ceph fs snapshot mirror ...` |
+| `client.cephfs-mirror.<host>.<id>` | **مبدأ** (`site-a`) | cephadm خودکار؛ در نصب دستی شما | اتصال daemon به کلاستر محلی |
+| `client.mirror_remote` | **مقصد** (`site-b`) | شما با `ceph fs authorize` | اتصال daemon مبدأ به کلاستر مقصد |
+
+نکته‌ها:
+
+- `client.mirror_remote` را روی **site-b** می‌سازید، چون daemon مبدأ باید روی مقصد بنویسد.
+- key این کاربر داخل token قرار می‌گیرد و با `peer_bootstrap import` به مبدأ می‌رسد؛ **keyring آن را دستی کپی نکنید**.
+
+ساخت کاربر ریموت. **روی نود ادمین `site-b`:**
 
 ```bash
 ceph fs authorize cephfs client.mirror_remote / rwps
 ```
 
-- `/` یعنی دسترسی روی کل filesystem.
-- `rwps` یعنی خواندن، نوشتن، ساخت snapshot و تغییر quota. این سطح دسترسی برای mirror لازم است.
-- کپی‌کردن key لازم نیست؛ در مرحله bootstrap داخل token قرار می‌گیرد.
-
-بررسی:
+دستور خودش caps مناسب را می‌سازد و روی صفحه چاپ می‌کند؛ نیازی به `get-or-create` دستی نیست. بررسی:
 
 ```bash
 ceph auth get client.mirror_remote
 ```
 
----
+ساخت دستی کاربر daemon (فقط بدون cephadm). **روی نود ادمین `site-a`:**
 
-## ۴. مراحل راه‌اندازی
+```bash
+ceph auth get-or-create client.cephfs-mirror.site-a \
+  mon 'profile cephfs-mirror' \
+  mds 'allow r' \
+  osd 'allow rw tag cephfs metadata=*, allow r tag cephfs data=*' \
+  mgr 'allow r' \
+  -o /etc/ceph/ceph.client.cephfs-mirror.site-a.keyring
+```
+
+سپس فایل را مطابق بخش ۳.۵ روی نودی که `cephfs-mirror` اجرا می‌شود قرار دهید و `chown ceph:ceph` و `chmod 600` را بزنید.
+
+## ۴. فایل‌های تولیدشده و انتقال بین کلاسترها
+
+در CephFS mirroring فقط **bootstrap token** بین کلاسترها جابه‌جا می‌شود. جهت انتقال برعکس RBD است: token روی **مقصد** ساخته می‌شود و به **مبدأ** می‌رود.
+
+### جدول فایل‌ها
+
+| فایل | کجا ساخته می‌شود | مسیر مبدأ | منتقل به | مسیر مقصد | بعد از انتقال |
+|---|---|---|---|---|---|
+| bootstrap token (JSON) | نود ادمین `site-b` (مقصد) | `/root/cephfs-token.json` | نود ادمین `site-a` (مبدأ) | `/root/cephfs-token.json` | `chmod 600`، استخراج token، import، حذف امن از هر دو سرور |
+| keyring کاربر daemon (فقط بدون cephadm) | نود ادمین `site-a` | `/etc/ceph/ceph.client.cephfs-mirror.site-a.keyring` | نودی از `site-a` که daemon روی آن اجرا می‌شود | همان مسیر | `chown ceph:ceph`، `chmod 600` |
+
+### مراحل دقیق انتقال token
+
+**۱. روی نود ادمین `site-b`** (ساخت فایل روی خود هاست):
+
+```bash
+# اگر ceph-common روی هاست نصب است
+ceph fs snapshot mirror peer_bootstrap create cephfs client.mirror_remote site-b > /root/cephfs-token.json
+
+# اگر از cephadm shell استفاده می‌کنید
+cephadm shell -- ceph fs snapshot mirror peer_bootstrap create cephfs client.mirror_remote site-b > /root/cephfs-token.json
+
+chmod 600 /root/cephfs-token.json
+```
+
+**۲. انتقال به `site-a`** (از نود ادمین site-b):
+
+```bash
+scp /root/cephfs-token.json root@<IP-نود-ادمین-site-a>:/root/cephfs-token.json
+```
+
+**۳. بعد از انتقال، روی نود ادمین `site-a`:**
+
+```bash
+chmod 600 /root/cephfs-token.json
+
+# استخراج رشته token از JSON (یکی از دو روش)
+TOKEN=$(jq -r .token /root/cephfs-token.json)
+# بدون jq:
+TOKEN=$(python3 -c 'import json; print(json.load(open("/root/cephfs-token.json"))["token"])')
+
+ceph fs snapshot mirror peer_bootstrap import cephfs "$TOKEN"
+# با cephadm shell (متغیر روی هاست جایگزین می‌شود):
+cephadm shell -- ceph fs snapshot mirror peer_bootstrap import cephfs "$TOKEN"
+```
+
+**۴. حذف امن token از هر دو سرور:**
+
+```bash
+unset TOKEN
+shred -u /root/cephfs-token.json      # روی site-a
+shred -u /root/cephfs-token.json      # روی site-b
+```
+
+**۵. بررسی:**
+
+```bash
+ceph fs snapshot mirror peer_list cephfs
+ceph fs snapshot mirror daemon status
+```
+
+### انتقال keyring (فقط بدون cephadm)
+
+```bash
+# روی نود ادمین site-a
+scp /etc/ceph/ceph.client.cephfs-mirror.site-a.keyring root@<IP-نود-mirror>:/etc/ceph/
+# روی نود mirror (باید ceph.conf کلاستر site-a هم آنجا باشد)
+chown ceph:ceph /etc/ceph/ceph.client.cephfs-mirror.site-a.keyring
+chmod 600 /etc/ceph/ceph.client.cephfs-mirror.site-a.keyring
+ceph -s --id cephfs-mirror.site-a       # تست
+```
+
+## ۵. مراحل راه‌اندازی
 
 ### مرحله ۱: فعال‌سازی ماژول mirroring (روی هر دو کلاستر)
 
@@ -122,7 +317,7 @@ ceph fs snapshot mirror peer_bootstrap create cephfs client.mirror_remote site-b
 ```
 
 - آرگومان‌ها به ترتیب: نام filesystem، entity ساخته‌شده در بخش cephx، و یک نام دلخواه برای شناسایی سایت.
-- خروجی یک JSON با فیلد `token` است. آن را کپی کنید (مثل یک رمز با آن رفتار کنید، چون دسترسی به کلاستر مقصد را می‌دهد).
+- خروجی یک JSON با فیلد `token` است. آن را مثل یک رمز نگه دارید، چون دسترسی به کلاستر مقصد را می‌دهد. روش دقیق ذخیره در فایل، انتقال به site-a و مراحل بعد از آن در بخش ۴ آمده است.
 
 ### مرحله ۵: import کردن token روی مبدأ (site-a)
 
@@ -146,7 +341,7 @@ ceph fs snapshot mirror add cephfs /data
 
 ---
 
-## ۵. ساخت snapshot
+## ۶. ساخت snapshot
 
 هیچ داده‌ای بدون snapshot منتقل نمی‌شود.
 
@@ -174,7 +369,7 @@ ceph fs snap-schedule status /data
 
 ---
 
-## ۶. بررسی و تست
+## ۷. بررسی و تست
 
 روی مبدأ:
 
@@ -195,7 +390,7 @@ ls /mnt/cephfs-dr/data/
 
 ---
 
-## ۷. عیب‌یابی
+## ۸. عیب‌یابی
 
 | علامت | بررسی |
 |---|---|
@@ -207,7 +402,7 @@ ls /mnt/cephfs-dr/data/
 
 ---
 
-## ۸. حذف و غیرفعال‌سازی
+## ۹. حذف و غیرفعال‌سازی
 
 ```bash
 ceph fs snapshot mirror remove cephfs /data          # حذف یک دایرکتوری
@@ -218,7 +413,7 @@ ceph fs snapshot mirror disable cephfs               # غیرفعال‌کردن
 
 ---
 
-## ۹. نکات مهم
+## ۱۰. نکات مهم
 
 - روی دایرکتوری‌هایی که mirror می‌شوند در مقصد **ننویسید**؛ تغییرات شما در sync بعدی بازنویسی می‌شود.
 - این mirroring یک‌طرفه است. برای failover باید مقصد را به‌صورت دستی به‌عنوان filesystem فعال استفاده کنید و برگشت (failback) فرآیند جدایی دارد.
