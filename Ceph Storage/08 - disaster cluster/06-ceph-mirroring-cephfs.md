@@ -126,74 +126,96 @@ ceph osd pool ls detail | grep cephfs
 
 ## ۵. ساخت کاربر cephx برای کلاینت
 
-دسترسی کامل به کل filesystem:
+هر برنامه/سرور یا Subvolume بهتر است کاربر CephX مستقل داشته باشد؛ مثلاً `client.app1` برای `app/app1` و `client.db1` برای `db/db1`. این کار دسترسی‌ها را از هم جدا می‌کند و اصل **حداقل دسترسی** را رعایت می‌کند.
+
+### دسترسی به کل filesystem
+
+فقط وقتی لازم است کل filesystem در اختیار کلاینت باشد:
 
 ```bash
-ceph fs authorize cephfs client.app1 / rw
+ceph fs authorize cephfs client.adminfs / rw
 ```
 
-دسترسی فقط به یک زیردایرکتوری (پیشنهادی، اصل حداقل دسترسی):
+### دسترسی به یک مسیر مشخص
 
 ```bash
 ceph fs authorize cephfs client.app1 /data rw
 ```
 
-برای اینکه کاربر بتواند snapshot هم بسازد، `rws` یا برای تغییر quota، `rwp`:
+برای ساخت snapshot نیز `s` را اضافه کن (`rws`) و برای تغییر layout یا quota، در صورت نیاز `p` را هم بده.
+
+### دسترسی اختصاصی به یک Subvolume
+
+ابتدا مسیر واقعی Subvolume را از خود Ceph بگیر؛ مسیر شامل UUID است و نباید آن را حدس بزنی:
 
 ```bash
-ceph fs authorize cephfs client.app1 /data rws
+ceph fs subvolume getpath cephfs app1 --group_name app
 ```
 
-> اگر برای همین کاربر دوباره `authorize` بزنی و مسیر جدیدی بدهی، caps قبلی ممکن است جایگزین یا خطادار شود؛ قبلش `ceph auth get client.app1` را ببین. برای تغییر دسترسی یک کاربر موجود از `ceph auth caps` استفاده کن.
+سپس همان مسیر را به `ceph fs authorize` بده و برای آن Subvolume یک کاربر جدا بساز:
 
-بررسی:
+```bash
+ceph fs authorize cephfs client.app1 \
+  /volumes/app/app1/<UUID> rw
+```
+
+برای Subvolume دیگر، نام کاربر و مسیر خودش را استفاده کن؛ برای نمونه:
+
+```bash
+ceph fs subvolume getpath cephfs db1 --group_name db
+ceph fs authorize cephfs client.db1 \
+  /volumes/db/db1/<UUID> rw
+```
+
+> `<UUID>` را با خروجی واقعی `getpath` جایگزین کن. مسیرهای `ceph fs authorize` از ریشه filesystem هستند. از یک کاربر مشترک برای چند Subvolume استفاده نکن، مگر اینکه عمداً دسترسی مشترک می‌خواهی.
+
+بررسی دسترسی:
 
 ```bash
 ceph auth get client.app1
+ceph auth get client.db1
 ```
 
-> مسیرها داخل `ceph fs authorize` نسبت به ریشه filesystem هستند. اگر دایرکتوری `/data` هنوز وجود ندارد، بعد از اولین mount با ادمین آن را بساز (مرحله ۷).
+در خروجی باید `caps mds` شامل `fsname=cephfs` و `path=` همان Subvolume باشد. اگر برای کاربر موجود دوباره `authorize` اجرا می‌کنی، ابتدا caps فعلی را بررسی کن؛ ممکن است دسترسی‌های قبلی آن کاربر تغییر کند.
 
-## ۶. آماده‌سازی کلاینت
+## ۶. آماده‌سازی فایل‌های احراز هویت کلاینت
 
-روی نود ادمین، فایل کانفیگ و فایل‌های احراز هویت را بساز:
+برای **Kernel mount**، فایل secret که فقط خود کلید را دارد کافی است. روی نود ادمین:
 
 ```bash
 ceph config generate-minimal-conf > /tmp/ceph.conf
-
-# برای Kernel mount:
 ceph auth get-key client.app1 > /tmp/app1.secret
-
-# برای Ceph-FUSE:
-ceph auth get client.app1 -o /tmp/ceph.client.app1.keyring
+chmod 600 /tmp/app1.secret
 ```
 
-فایل‌های لازم را به سرور کلاینت منتقل کن (مثلاً با `scp`). روی کلاینت:
+برای **Ceph-FUSE**، به‌جای secret، کل Keyring را دریافت کن:
 
 ```bash
-apt install -y ceph-common
-mkdir -p /etc/ceph
-
-# فایل‌ها را در این مسیر قرار بده:
-# /etc/ceph/ceph.conf
-# /etc/ceph/app1.secret
-# /etc/ceph/ceph.client.app1.keyring
-
-chmod 600 /etc/ceph/app1.secret /etc/ceph/ceph.client.app1.keyring
+ceph auth get client.app1 -o /tmp/ceph.client.app1.keyring
+chmod 600 /tmp/ceph.client.app1.keyring
 ```
 
-- کلاینت باید به MONها (پورت‌های 3300 و 6789)، OSDها (معمولاً پورت‌های 6800 تا 7568) و MDSها دسترسی شبکه داشته باشد.
-- `app1.secret` فقط مقدار کلید است؛ keyring علاوه بر کلید، نام کاربر و اطلاعات احراز هویت را هم دارد.
-- برای Ceph-FUSE از keyring استفاده کن؛ `secretfile` مخصوص روش Kernel mount است.
+فایل‌های لازم را با `scp` به کلاینت منتقل کن. نمونه برای FUSE:
+
+```bash
+scp /tmp/ceph.conf /tmp/ceph.client.app1.keyring root@<CLIENT-IP>:/root/
+```
+
+روی کلاینت:
+
+```bash
+apt install -y ceph-common ceph-fuse
+mkdir -p /etc/ceph
+mv /root/ceph.conf /etc/ceph/ceph.conf
+mv /root/ceph.client.app1.keyring /etc/ceph/ceph.client.app1.keyring
+chmod 600 /etc/ceph/ceph.client.app1.keyring
+```
+
+- کلاینت باید به Monitorها (پورت‌های 3300 و 6789)، OSDها (معمولاً 6800 تا 7568) و MDSها دسترسی شبکه داشته باشد.
+- فایل `app1.secret` فقط کلید خام است؛ فایل `ceph.client.app1.keyring` شامل کلید و نام کاربر است.
+- برای هر کاربر جدا، Keyring جداگانه منتقل کن؛ کلید `client.db1` را به کلاینت `app1` نده.
 
 ## ۷. Mount
-
-دو روش برای Mount کردن CephFS وجود دارد:
-
-- **Kernel client (`mount -t ceph`)**: معمولاً کارایی بالاتری دارد.
-- **Ceph-FUSE (`ceph-fuse`)**: در فضای User-space اجرا می‌شود و جایگزین Kernel client است. اگر Kernel نتواند فرمت کلید CephX را بپذیرد، از این روش استفاده کن.
-
-### روش اول: Kernel mount
 
 روی کلاینت:
 
@@ -202,7 +224,7 @@ mkdir -p /mnt/cephfs
 mount -t ceph app1@.cephfs=/ /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
-ساختار `کاربر@.نام_fs=/مسیر` است (بعد از `@` نقطه می‌آید و fsid خالی می‌ماند؛ MONها از `ceph.conf` خوانده می‌شوند). اگر نسخه Kernel یا `mount.ceph` این سینتکس را پشتیبانی نمی‌کند، سینتکس قدیمی را امتحان کن:
+ساختار `کاربر@.نام_fs=/مسیر` است (بعد از `@` نقطه می‌آید و fsid خالی می‌ماند؛ mon ها از `ceph.conf` خوانده می‌شوند). اگر نسخه kernel یا mount.ceph قدیمی است و این سینتکس را نمی‌شناسد، سینتکس قدیمی:
 
 ```bash
 mount -t ceph <IP-mon>:6789:/ /mnt/cephfs -o name=app1,secretfile=/etc/ceph/app1.secret,fs=cephfs
@@ -211,157 +233,55 @@ mount -t ceph <IP-mon>:6789:/ /mnt/cephfs -o name=app1,secretfile=/etc/ceph/app1
 بررسی:
 
 ```bash
-df -hT /mnt/cephfs
+df -h /mnt/cephfs
 mount | grep ceph
 ```
 
-### Mount کردن فقط یک مسیر یا Subvolume
+### دایرکتوری `/data` را اگر هنوز نیست بساز
 
-اگر کاربر فقط به `/data` دسترسی دارد، همان مسیر را به‌عنوان ریشه Mount کن:
+اگر کاربر محدود به `/data` است و این دایرکتوری وجود ندارد، با یک mount ادمین (روی نود ادمین) بساز:
 
 ```bash
-mkdir -p /mnt/cephfs
+mkdir -p /mnt/admin-cephfs
+mount -t ceph :/ /mnt/admin-cephfs -o name=admin,fs=cephfs
+mkdir -p /mnt/admin-cephfs/data
+umount /mnt/admin-cephfs
+```
+
+سپس کلاینت را روی مسیر محدود mount کن:
+
+```bash
 mount -t ceph app1@.cephfs=/data /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
-اگر از Subvolume استفاده می‌کنی، به‌جای `/data` مسیر کامل آن را قرار بده. مسیر را با دستور زیر روی نود ادمین Ceph به دست بیاور:
+### تست
 
 ```bash
-ceph fs subvolume getpath <اسم-filesystem> <اسم-subvolume> --group_name <اسم-subvolume-group>
+echo "hello" > /mnt/cephfs/test.txt
+cat /mnt/cephfs/test.txt
 ```
 
-مثلاً در آزمایش فعلی ما:
-
-```bash
-ceph fs subvolume getpath cephfs app1 --group_name app
-```
-
-خروجی، مسیر کامل Subvolume را برمی‌گرداند؛ برای مثال:
-
-```text
-/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
-```
-
-معنی پارامترها:
-- `cephfs`: نام CephFS
-- `app1`: نام Subvolume
-- `app`: نام Subvolume Group
-
-این دستور را با دسترسی مدیریتی روی کلاستر اجرا کن؛ سپس مسیر خروجی را در گزینه `-r` دستور `ceph-fuse` یا مسیر Mount در دستور Kernel قرار بده.
-
-اگر دایرکتوری مجازشده هنوز وجود ندارد، آن را با یک Mount ادمین بساز؛ سپس کلاینت محدودشده را Mount کن.
-
-### روش دوم: Ceph-FUSE (جایگزین Kernel mount)
-
-اگر Kernel هنگام Mount خطایی مانند `secret too big 32` می‌دهد، فعلاً به‌جای تغییر Caps یا ساخت مجدد کاربر، از Ceph-FUSE استفاده کن. این خطا یعنی Kernel نتوانسته Secret را در قالب مورد انتظار خودش وارد کند؛ Ceph-FUSE احراز هویت را در User-space انجام می‌دهد.
-
-نصب:
-
-```bash
-apt install -y ceph-fuse
-```
-
-Mount کل filesystem:
-
-```bash
-mkdir -p /mnt/cephfs
-ceph-fuse \
-  -n client.app1 \
-  -k /etc/ceph/ceph.client.app1.keyring \
-  -m <IP-mon>:6789 \
-  --client_fs cephfs \
-  /mnt/cephfs
-```
-
-Mount مستقیم یک مسیر محدود یا Subvolume:
-
-```bash
-mkdir -p /mnt/cephfs
-ceph-fuse \
-  -n client.app1 \
-  -k /etc/ceph/ceph.client.app1.keyring \
-  -m <IP-mon>:6789 \
-  --client_fs cephfs \
-  -r /data \
-  /mnt/cephfs
-```
-
-`-r` مسیر داخل CephFS را به‌عنوان ریشه Mount انتخاب می‌کند. برای Subvolume، مسیر کامل خروجی `ceph fs subvolume getpath` را به‌جای `/data` قرار بده. گزینه `-m` اختیاری است اگر MONها در `/etc/ceph/ceph.conf` تعریف شده باشند.
-
-**نمونه مطابق آزمایش فعلی:**
-
-ابتدا روی نود ادمین مسیر Subvolume را بگیر:
-
-```bash
-ceph fs subvolume getpath cephfs app1 --group_name app
-```
-
-خروجی این دستور را در گزینه `-r` قرار بده. در حال حاضر خروجی Subvolume ما این است:
-
-`/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd`
-
-کاربر `client.app1` به همین مسیر محدود شده است. پس روی `node2`، بعد از قرار دادن keyring در مسیر گفته‌شده:
-
-```bash
-apt install -y ceph-fuse
-
-mkdir -p /mnt/cephfs/app/app1
-
-ceph-fuse \
-  -n client.app1 \
-  -k /root/ceph.client.app1.keyring \
-  -m 192.168.57.25:6789 \
-  --client_fs cephfs \
-  -r /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd \
-  /mnt/cephfs/app/app1
-```
-
-Keyring را روی node2 از نود ادمین منتقل کن یا همان‌جا با دسترسی مناسب بساز:
-
-```bash
-ceph auth get client.app1 -o /root/ceph.client.app1.keyring
-chmod 600 /root/ceph.client.app1.keyring
-```
-
-تست و بررسی:
-
-```bash
-df -hT /mnt/cephfs/app/app1
-mount | grep ceph
-touch /mnt/cephfs/app/app1/test.txt
-ls -l /mnt/cephfs/app/app1/
-```
-
-Unmount:
-
-```bash
-umount /mnt/cephfs/app/app1
-```
-
-### Mount دائمی
-
-برای Kernel mount می‌توانی از `/etc/fstab` استفاده کنی:
+### Mount دائمی (fstab)
 
 ```bash
 echo 'app1@.cephfs=/data  /mnt/cephfs  ceph  secretfile=/etc/ceph/app1.secret,_netdev,noatime  0 0' >> /etc/fstab
 mount -a
 ```
 
-برای Ceph-FUSE، ورودی fstab به این شکل است:
+`_netdev` مهم است تا mount بعد از بالا آمدن شبکه انجام شود.
 
-```fstab
-none  /mnt/cephfs  fuse.ceph  ceph.id=app1,ceph.conf=/etc/ceph/ceph.conf,ceph.client_fs=cephfs,ceph.client_mountpoint=/data,_netdev,defaults  0  0
-```
+### جایگزین: Ceph-FUSE
 
-در گزینه `ceph.id` فقط شناسه `app1` را بنویس، نه `client.app1`. برای Mount کردن Subvolume، مقدار `ceph.client_mountpoint` را با مسیر کامل Subvolume جایگزین کن. بعد از افزودن ورودی، اجرا کن:
+اگر Kernel client قابل استفاده نیست، از Ceph-FUSE استفاده کن. ابتدا Keyring کاربر را طبق مرحله ۶ روی کلاینت قرار بده:
 
 ```bash
-mount -a
+mkdir -p /mnt/cephfs
+ceph-fuse -n client.app1 \
+  --client_fs cephfs \
+  /mnt/cephfs
 ```
 
-`_netdev` مهم است تا Mount بعد از آماده‌شدن شبکه انجام شود.
-
-نکته: Ceph-FUSE معمولاً نسبت به Kernel client کارایی پایین‌تری دارد، اما در این سناریو راه جایگزین مناسبی برای عبور از خطای پردازش Secret در Kernel است.
+برای mount کردن فقط یک مسیر مشخص، از گزینه `-r` استفاده کن؛ مثال کامل Subvolume در مرحله ۹ آمده است. اگر Keyring در مسیر پیش‌فرض نیست، آن را با `-k /path/to/keyring` معرفی کن.
 
 ## ۸. Quota
 
@@ -376,18 +296,161 @@ getfattr -n ceph.quota.max_bytes /mnt/cephfs/data
 
 برای برداشتن quota مقدار را `0` بگذار. quota در سمت کلاینت اعمال می‌شود و سخت‌گیرانه (hard) نیست؛ کلاینت‌های مخرب یا قدیمی می‌توانند از آن عبور کنند.
 
-## ۹. Subvolume (اختیاری)
+## ۹. Subvolume، کاربر مستقل و Mount با Ceph-FUSE
+
+Subvolumeها داخل یک filesystem قرار می‌گیرند، اما می‌توان برای هرکدام quota و کاربر CephX مستقل تعریف کرد. مثال این بخش دو Subvolume با گروه‌های جداگانه `app` و `db` است.
+
+### ۹.۱. ساخت Group و Subvolume
 
 ```bash
-ceph fs subvolumegroup create cephfs mygroup
-ceph fs subvolume create cephfs vol1 --group_name mygroup --size 10737418240
-ceph fs subvolume getpath cephfs vol1 --group_name mygroup
-ceph fs subvolume ls cephfs --group_name mygroup
+ceph fs subvolumegroup create cephfs app
+ceph fs subvolume create cephfs app1 --group_name app --size 10737418240
+
+ceph fs subvolumegroup create cephfs db
+ceph fs subvolume create cephfs db1 --group_name db --size 10737418240
 ```
 
-- `--size` اندازه quota به بایت است (اینجا ۱۰ گیگابایت).
-- `getpath` مسیر داخل filesystem را می‌دهد (مثل `/volumes/mygroup/vol1/<uuid>`). همین مسیر را در `authorize` یا mount و در mirroring (`snapshot mirror add`) به کار ببر.
-- حذف: `ceph fs subvolume rm cephfs vol1 --group_name mygroup`
+`--size` برحسب بایت است؛ مقدار بالا ۱۰ GiB است.
+
+### ۹.۲. گرفتن مسیر واقعی Subvolume
+
+این دستور را برای هر Subvolume اجرا کن:
+
+```bash
+ceph fs subvolume getpath cephfs app1 --group_name app
+ceph fs subvolume getpath cephfs db1 --group_name db
+```
+
+نمونه خروجی:
+
+```text
+/volumes/app/app1/<UUID>
+/volumes/db/db1/<UUID>
+```
+
+UUID را خود Ceph تعیین می‌کند. مسیر خروجی `getpath` را عیناً در مراحل بعد استفاده کن؛ مسیر را دستی نساز یا UUID را حدس نزن.
+
+### ۹.۳. ساخت کاربر اختصاصی برای هر Subvolume
+
+برای `app1`:
+
+```bash
+ceph fs authorize cephfs client.app1 \
+  /volumes/app/app1/<UUID> rw
+```
+
+برای `db1`:
+
+```bash
+ceph fs authorize cephfs client.db1 \
+  /volumes/db/db1/<UUID> rw
+```
+
+در هر دو دستور، `<UUID>` را با مسیر کامل واقعی که از `getpath` گرفتی جایگزین کن.
+
+- `client.app1` فقط به مسیر Subvolume مربوط به `app1` مجوز می‌گیرد.
+- `client.db1` فقط به مسیر Subvolume مربوط به `db1` مجوز می‌گیرد.
+- برای هر Subvolume/برنامه از کاربر مجزا استفاده کن تا compromise شدن یک کلید، دسترسی به بقیه Subvolumeها را ندهد.
+- `rw` یعنی خواندن و نوشتن. برای ساخت snapshot، در صورت نیاز `s` را هم اضافه کن (`rws`).
+
+بررسی Caps:
+
+```bash
+ceph auth get client.app1
+ceph auth get client.db1
+```
+
+در خروجی هر کاربر، `caps mds` باید `fsname=cephfs` و `path=` مسیر همان Subvolume را نشان دهد.
+
+### ۹.۴. استخراج Keyring مجزا
+
+روی نود ادمین، برای هر کاربر فایل Keyring جدا بساز:
+
+```bash
+ceph auth get client.app1 -o /root/ceph.client.app1.keyring
+ceph auth get client.db1 -o /root/ceph.client.db1.keyring
+
+chmod 600 /root/ceph.client.app1.keyring
+chmod 600 /root/ceph.client.db1.keyring
+```
+
+Keyring مربوط به هر کاربر را امن به سروری که قرار است همان Subvolume را mount کند منتقل کن. برای مثال، اگر روی همان نود تست می‌کنی، فایل‌ها را در `/root/` نگه دار.
+
+### ۹.۵. Mount کردن Subvolume با Ceph-FUSE
+
+ابتدا مسیر mount را بساز. مثال برای `db1`:
+
+```bash
+mkdir -p /mnt/cephfs/db/db1
+```
+
+سپس با کاربر و Keyring اختصاصی خودش mount کن. مقدار `-r` باید دقیقاً خروجی `getpath` باشد:
+
+```bash
+ceph-fuse \
+  -n client.db1 \
+  -k /root/ceph.client.db1.keyring \
+  -m <MON-IP>:6789 \
+  --client_fs cephfs \
+  -r /volumes/db/db1/<UUID> \
+  /mnt/cephfs/db/db1
+```
+
+برای مثال واقعی این محیط، IP مانیتور `192.168.57.25` است؛ در محیط دیگر IP مانیتور خودت را قرار بده.
+
+برای `app1` نیز همین مراحل را با اطلاعات خودش اجرا کن:
+
+```bash
+mkdir -p /mnt/cephfs/app/app1
+
+ceph-fuse \
+  -n client.app1 \
+  -k /root/ceph.client.app1.keyring \
+  -m <MON-IP>:6789 \
+  --client_fs cephfs \
+  -r /volumes/app/app1/<UUID> \
+  /mnt/cephfs/app/app1
+```
+
+### ۹.۶. بررسی Mount و تست نوشتن
+
+```bash
+mount | grep ceph
+ df -hT /mnt/cephfs/db/db1
+```
+
+تست نوشتن با همان کلاینت:
+
+```bash
+echo "cephfs db1 test" > /mnt/cephfs/db/db1/test.txt
+cat /mnt/cephfs/db/db1/test.txt
+```
+
+برای اطمینان از جداسازی، کاربر `client.db1` نباید بتواند به Subvolume دیگر (مثلاً مسیر `app1`) دسترسی داشته باشد.
+
+### ۹.۷. Unmount
+
+قبل از unmount مطمئن شو فرایندی در مسیر mount مشغول کار نیست:
+
+```bash
+fusermount3 -u /mnt/cephfs/db/db1
+```
+
+در صورت نیاز برای Subvolume دیگر نیز مسیر خودش را unmount کن.
+
+### نکات مهم
+
+- مسیر mount محلی مثل `/mnt/cephfs/db/db1` با مسیر داخل CephFS مثل `/volumes/db/db1/<UUID>` فرق دارد.
+- `-n` نام کاربر CephX، `-k` فایل Keyring همان کاربر، `-m` آدرس Monitor و `-r` ریشه‌ای است که کلاینت اجازه دیدن آن را دارد.
+- اگر پیام `no keyring found` دیدی، مسیر/محتوای Keyring یا نام کاربر را بررسی کن.
+- اگر پیام `rejected us (non-allowable root ...)` دیدی، مسیر `-r` با MDS cap کاربر مطابقت ندارد؛ خروجی `ceph auth get <user>` و `ceph fs subvolume getpath` را بررسی کن.
+- اگر خطای `Operation not permitted` گرفتی، اول مطمئن شو برای همان Subvolume کاربر مجزا ساخته‌ای و مسیر کامل `getpath` را به `ceph fs authorize` داده‌ای.
+
+حذف Subvolume (با احتیاط؛ داده‌های آن حذف می‌شود):
+
+```bash
+ceph fs subvolume rm cephfs db1 --group_name db
+```
 
 ## ۱۰. Snapshot
 
@@ -407,7 +470,9 @@ rmdir /mnt/cephfs/data/.snap/snap-test      # حذف snapshot
 | `ceph fs status` هیچ MDS فعالی ندارد | `ceph orch ps --daemon-type mds` و `cephadm logs --name <نام-daemon-mds>` |
 | وضعیت `HEALTH_WARN` با `insufficient standby MDS` | تعداد MDS را بیشتر کن: `ceph orch apply mds cephfs --placement="3"` |
 | `mount error: no mds server is up or the cluster is laggy` | اتصال به mon ها و MDS ها، فایروال، وضعیت MDS |
-| `mount error 13 = Permission denied` | کلید اشتباه، یا caps کاربر؛ `ceph auth get client.app1` |
+| `mount error 13 = Permission denied` | کلید اشتباه یا caps کاربر؛ `ceph auth get <client>` و `ceph fs subvolume getpath` را بررسی کن. برای هر Subvolume کاربر مستقل بساز. |
+| `no keyring found` در Ceph-FUSE | فایل Keyring پیدا نشده یا نام/مسیر آن اشتباه است؛ گزینه `-k` و `-n` را بررسی کن. |
+| `rejected us (non-allowable root ...)` | مسیر `-r` با مسیر مجاز در MDS cap یکی نیست؛ مسیر واقعی `getpath` را در `ceph fs authorize` و `-r` عیناً استفاده کن. |
 | `mount error 110 = Connection timed out` | شبکه یا فایروال بین کلاینت و mon/OSD/MDS |
 | mount کار می‌کند ولی نوشتن خطا می‌دهد | حرف `w` در caps؟ quota؟ پر بودن pool (`ceph df`)؟ |
 | ساخت snapshot خطای مجوز می‌دهد | حرف `s` در caps کاربر، و `allow_new_snaps` |
@@ -427,50 +492,64 @@ ceph config set mon mon_allow_pool_delete false
 
 # بخش دوم: CephFS Mirroring
 
-جهت: یک‌طرفه، از `site-a` (مبدأ) به `site-b` (مقصد). مبتنی بر snapshot است و فقط snapshot ها منتقل می‌شوند. این یک DR است، نه backup.
+جهت انتقال در این مثال یک‌طرفه است: از `site-a` (مبدأ) به `site-b` (مقصد). Mirroring بر اساس Snapshot کار می‌کند؛ بنابراین تغییرات فقط پس از ساخته‌شدن و انتقال Snapshot در مقصد دیده می‌شوند. این قابلیت برای DR مفید است، اما جایگزین Backup مستقل نیست.
+
+در این سناریو، به‌جای Mirror کردن کل filesystem، دو Subvolume مشخص را Mirror می‌کنیم:
+
+| مورد | Group | Subvolume | مسیر روی filesystem مبدأ |
+|---|---|---|---|
+| برنامه | `app` | `app1` | `/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd` |
+| دیتابیس | `db` | `db1` | `/volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea` |
+
+> این UUIDها همان خروجی‌هایی هستند که در کلاستر فعلی گرفته‌ای. اگر Subvolume را حذف و دوباره ایجاد کنی، UUID جدید خواهد داشت؛ در آن صورت مسیر را دوباره با `ceph fs subvolume getpath` بگیر و در تمام مراحل Mirroring جایگزین کن.
 
 ## مقادیری که باید با مقادیر خودت جایگزین کنی
 
 | نماد | معنی |
 |---|---|
-| `site-a` | کلاستر مبدأ، و `<IP-site-a>` آی‌پی نود ادمین آن |
-| `site-b` | کلاستر مقصد، و `<IP-site-b>` آی‌پی نود ادمین آن |
-| `cephfs` | نام filesystem |
-| `/data` | دایرکتوری‌ای که mirror می‌شود |
+| `site-a` | نام کلاستر مبدأ |
+| `site-b` | نام کلاستر مقصد |
+| `<IP-site-a>` | IP نود ادمین کلاستر مبدأ |
+| `<IP-site-b>` | IP نود ادمین کلاستر مقصد |
+| `cephfs` | نام filesystem در هر دو کلاستر |
+| مسیرهای `app1` و `db1` | مسیرهای واقعی Subvolumeهای بالا |
 
-## cephx: چه کاری لازم است؟
+**مهم:** دستورهای مراحل ۲ تا ۴ و ۸ تا ۱۰ روی مبدأ اجرا می‌شوند؛ ساخت کاربر و token در مراحل ۵ و ۶ روی مقصد انجام می‌شود. قبل از اجرای هر دستور، مطمئن شو CLI به کلاستر درست متصل است (`ceph fsid`).
 
-- کاربر daemon روی site-a را cephadm خودکار می‌سازد.
-- **تنها کاربری که دستی می‌سازی** `client.mirror_remote` روی **site-b** است (مرحله ۵). کلید آن داخل token می‌رود، پس keyring را کپی نمی‌کنی.
+## مرحله ۰: آماده‌سازی (روی نود ادمین هر دو کلاستر)
 
----
-
-## مرحله ۰: آماده‌سازی (روی نود ادمین site-a و نود ادمین site-b)
-
-روی **هر دو**:
+روی هر دو کلاستر:
 
 ```bash
 cephadm install ceph-common
 apt install -y jq
 ceph -s
 ceph fsid
-```
-
-- `ceph -s` باید `HEALTH_OK` بدهد.
-- `ceph fsid` را روی هر دو بنویس، تا دستورها را روی کلاستر اشتباه نزنی.
-- از site-a به mon های site-b دسترسی شبکه (3300 و 6789) و ssh از site-a به site-b داشته باش.
-
-## مرحله ۱: وجود filesystem روی هر دو کلاستر
-
-```bash
 ceph fs ls
 ```
 
-اگر در یکی نبود (مثلاً روی site-b)، طبق بخش اول بساز:
+- نام filesystem در هر دو کلاستر باید `cephfs` باشد.
+- `ceph -s` را بررسی کن؛ MDS باید فعال باشد و کلاستر باید برای انتقال داده آماده باشد.
+- از مبدأ باید ارتباط شبکه‌ای با Monitorهای مقصد (پورت‌های 3300 و 6789) برقرار باشد.
+- دسترسی SSH از مبدأ به مقصد نیز برای روش bootstrap مورد استفاده در این مستند لازم است.
+
+## مرحله ۱: کنترل مسیر Subvolumeها (روی site-a)
+
+قبل از شروع، مسیرها را از خود Ceph بگیر:
 
 ```bash
-ceph fs volume create cephfs --placement="2"
+ceph fs subvolume getpath cephfs app1 --group_name app
+ceph fs subvolume getpath cephfs db1 --group_name db
 ```
+
+خروجی مورد انتظار در کلاستر فعلی:
+
+```text
+/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+/volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
+```
+
+این مسیرها را در مراحل بعد عیناً استفاده کن. مسیر Mount محلی مثل `/mnt/cephfs/app/app1` با مسیر داخل CephFS یکی نیست؛ در فرمان‌های `snapshot mirror add` باید مسیر داخل filesystem را بدهی.
 
 ## مرحله ۲: فعال‌سازی ماژول mirroring (روی هر دو کلاستر)
 
@@ -478,14 +557,14 @@ ceph fs volume create cephfs --placement="2"
 ceph mgr module enable mirroring
 ```
 
-## مرحله ۳: اجرای daemon (روی نود ادمین site-a)
+## مرحله ۳: اجرای daemon (روی site-a)
 
 ```bash
 ceph orch apply cephfs-mirror
 ceph orch ps --daemon-type cephfs-mirror
 ```
 
-صبر کن وضعیت به `running` برسد.
+صبر کن daemon با وضعیت `running` نمایش داده شود.
 
 ## مرحله ۴: فعال‌سازی mirroring روی filesystem (روی site-a)
 
@@ -493,39 +572,48 @@ ceph orch ps --daemon-type cephfs-mirror
 ceph fs snapshot mirror enable cephfs
 ```
 
-## مرحله ۵: ساخت کاربر cephx برای مقصد (روی نود ادمین site-b)
+## مرحله ۵: ساخت کاربر cephx برای اتصال به مقصد (روی site-b)
+
+برای اتصال Mirror به کلاستر مقصد یک کاربر اختصاصی بساز:
 
 ```bash
 ceph fs authorize cephfs client.mirror_remote / rwps
 ```
 
-خروجی یک keyring است؛ لازم نیست جایی کپی‌اش کنی. بررسی:
+در این مثال کاربر Mirror روی کل filesystem مقصد مجوز دارد؛ این کاربر را برای Mount عادی برنامه یا دیتابیس استفاده نکن. کاربران `client.app1` و `client.db1` همچنان کاربران مستقل و محدود به Subvolumeهای خودشان هستند.
+
+بررسی:
 
 ```bash
 ceph auth get client.mirror_remote
 ```
 
-## مرحله ۶: ساخت token (روی نود ادمین site-b)
+## مرحله ۶: ساخت token اتصال (روی site-b)
 
 ```bash
 ceph fs snapshot mirror peer_bootstrap create cephfs client.mirror_remote site-b > /root/cephfs-token.json
 chmod 600 /root/cephfs-token.json
-cat /root/cephfs-token.json
 ```
 
-باید یک JSON با فیلد `token` ببینی.
+برای مشاهده token:
 
-## مرحله ۷: انتقال token (از site-b به site-a)
+```bash
+jq . /root/cephfs-token.json
+```
 
-روی نود ادمین **site-b**:
+فایل token حاوی اطلاعات حساس اتصال است؛ آن را در پیام‌رسان یا محل عمومی قرار نده.
+
+## مرحله ۷: انتقال token از مقصد به مبدأ
+
+این دستور را روی `site-b` اجرا کن:
 
 ```bash
 scp /root/cephfs-token.json root@<IP-site-a>:/root/cephfs-token.json
 ```
 
-دقت کن در CephFS جهت انتقال برعکس RBD است: token روی مقصد ساخته می‌شود و به مبدأ می‌رود.
+توجه: token روی مقصد ساخته می‌شود و به مبدأ منتقل می‌شود؛ چون daemon مبدأ باید بتواند به filesystem مقصد وصل شود.
 
-## مرحله ۸: import کردن token (روی نود ادمین site-a)
+## مرحله ۸: Import کردن token (روی site-a)
 
 ```bash
 chmod 600 /root/cephfs-token.json
@@ -534,104 +622,192 @@ ceph fs snapshot mirror peer_bootstrap import cephfs "$TOKEN"
 unset TOKEN
 ```
 
-بررسی:
+بررسی peer:
 
 ```bash
 ceph fs snapshot mirror peer_list cephfs
 ```
 
-باید یک peer با نام `site-b` ببینی.
+باید peer مقصد با نام `site-b` نمایش داده شود.
 
-## مرحله ۹: افزودن دایرکتوری (روی نود ادمین site-a)
+## مرحله ۹: اضافه‌کردن Subvolumeها به Mirroring (روی site-a)
 
-ابتدا filesystem را mount کن و دایرکتوری را بساز:
-
-```bash
-mkdir -p /mnt/cephfs
-mount -t ceph :/ /mnt/cephfs -o name=admin,fs=cephfs
-mkdir -p /mnt/cephfs/data
-```
-
-سپس:
+هر Subvolume را با مسیر واقعی خودش جداگانه اضافه کن:
 
 ```bash
-ceph fs snapshot mirror add cephfs /data
+ceph fs snapshot mirror add cephfs \
+  /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+
+ceph fs snapshot mirror add cephfs \
+  /volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
 ```
 
-> اگر داده داخل subvolume است، به‌جای `/data` مسیر کامل subvolume را بده (خروجی `ceph fs subvolume getpath`).
-
-## مرحله ۱۰: ساخت snapshot (روی site-a)
-
-بدون snapshot چیزی منتقل نمی‌شود.
-
-تست دستی:
+بررسی وضعیت:
 
 ```bash
-echo "test" > /mnt/cephfs/data/file1.txt
-mkdir /mnt/cephfs/data/.snap/snap1
+ceph fs snapshot mirror status cephfs
 ```
 
-اگر خطای مجوز گرفتی: `ceph fs set cephfs allow_new_snaps true`
+اگر لازم است مسیرها را دوباره از کلاستر بگیری و جایگزین کنی:
 
-خودکار (برای استفاده دائمی):
+```bash
+APP_PATH=$(ceph fs subvolume getpath cephfs app1 --group_name app)
+DB_PATH=$(ceph fs subvolume getpath cephfs db1 --group_name db)
+printf 'APP_PATH=%s\nDB_PATH=%s\n' "$APP_PATH" "$DB_PATH"
+```
+
+سپس مقدار خروجی را در دو دستور `snapshot mirror add` قرار بده. این روش از اشتباه گرفتن مسیر Mount محلی با مسیر داخلی CephFS جلوگیری می‌کند.
+
+## مرحله ۱۰: ساخت Snapshot در مسیرهای مبدأ
+
+Mirroring بدون Snapshot چیزی برای انتقال ندارد. برای تست، ابتدا روی مبدأ یک mount مدیریتی از ریشه filesystem انجام بده. روی نود ادمین `site-a`:
+
+```bash
+mkdir -p /mnt/cephfs-source
+mount -t ceph :/ /mnt/cephfs-source -o name=admin,fs=cephfs
+```
+
+دو مسیر محلی متناظر با Subvolumeها:
+
+```bash
+APP_MOUNT=/mnt/cephfs-source/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+DB_MOUNT=/mnt/cephfs-source/volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
+```
+
+برای تست، در هر Subvolume یک فایل بساز:
+
+```bash
+echo "test app1" > "$APP_MOUNT/mirror-test.txt"
+echo "test db1" > "$DB_MOUNT/mirror-test.txt"
+```
+
+سپس در هر مسیر Snapshot بساز:
+
+```bash
+mkdir "$APP_MOUNT/.snap/snap1"
+mkdir "$DB_MOUNT/.snap/snap1"
+```
+
+بررسی Snapshotها:
+
+```bash
+ls "$APP_MOUNT/.snap/"
+ls "$DB_MOUNT/.snap/"
+```
+
+برای استفاده دائمی می‌توانی Snapshot Schedule جداگانه برای هر مسیر تنظیم کنی:
 
 ```bash
 ceph mgr module enable snap_schedule
-ceph fs snap-schedule add /data 1h
-ceph fs snap-schedule retention add /data h 24
-ceph fs snap-schedule status /data
+ceph fs snap-schedule add /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd 1h
+ceph fs snap-schedule add /volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea 1h
 ```
 
-## مرحله ۱۱: بررسی
+نمونه retention برای نگهداری ۲۴ Snapshot ساعتی:
 
-روی **site-a**:
+```bash
+ceph fs snap-schedule retention add /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd h 24
+ceph fs snap-schedule retention add /volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea h 24
+```
+
+وضعیت Scheduleها:
+
+```bash
+ceph fs snap-schedule status /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+ceph fs snap-schedule status /volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
+```
+
+## مرحله ۱۱: بررسی انتقال روی مقصد
+
+روی `site-a` وضعیت daemon و peer را بررسی کن:
 
 ```bash
 ceph fs snapshot mirror daemon status
 ceph fs snapshot mirror peer_list cephfs
+ceph fs snapshot mirror status cephfs
 ```
 
-روی **site-b** (بعد از چند ثانیه تا چند دقیقه):
+بعد از چند ثانیه تا چند دقیقه، روی نود ادمین `site-b` filesystem را mount کن:
 
 ```bash
 mkdir -p /mnt/cephfs-dr
 mount -t ceph :/ /mnt/cephfs-dr -o name=admin,fs=cephfs
-ls /mnt/cephfs-dr/data/.snap/
-ls /mnt/cephfs-dr/data/
 ```
 
-## مرحله ۱۲: پاک‌سازی (روی هر دو نود ادمین)
+مسیرهای متناظر روی مقصد:
 
-بعد از اینکه `peer_list` روی site-a نشان داد peer اضافه شده:
+```bash
+APP_DR=/mnt/cephfs-dr/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+DB_DR=/mnt/cephfs-dr/volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
+```
+
+Snapshotها و فایل‌های تست را بررسی کن:
+
+```bash
+ls "$APP_DR/.snap/"
+ls "$DB_DR/.snap/"
+cat "$APP_DR/.snap/snap1/mirror-test.txt"
+cat "$DB_DR/.snap/snap1/mirror-test.txt"
+```
+
+در Mirroring مبتنی بر Snapshot، داده Snapshot در مقصد بررسی می‌شود؛ انتظار نداشته باش هر تغییر جدید قبل از ساخته‌شدن و Sync شدن Snapshot در مقصد ظاهر شود.
+
+## مرحله ۱۲: پاک‌سازی فایل token و Unmount
+
+پس از اطمینان از برقراری peer، فایل token را از هر دو کلاستر پاک کن:
 
 ```bash
 shred -u /root/cephfs-token.json
 ```
 
-این دستور را روی **site-a** و **site-b** هر دو بزن.
+Mountهای تست را نیز در صورت عدم نیاز باز کن:
+
+```bash
+umount /mnt/cephfs-source
+umount /mnt/cephfs-dr
+```
 
 ---
 
-## عیب‌یابی سریع (mirroring)
+## عیب‌یابی سریع (Mirroring)
 
-| علامت | کار |
+| علامت | بررسی / راهکار |
 |---|---|
-| daemon بالا نمی‌آید | `ceph orch ps --daemon-type cephfs-mirror` و `cephadm logs --name <نام-daemon>` روی site-a |
-| import خطا می‌دهد | نام filesystem، سالم‌بودن token، دسترسی شبکه به mon های site-b |
-| داده منتقل نمی‌شود | snapshot ساخته‌ای؟ مسیر با `snapshot mirror add` اضافه شده؟ |
-| authentication error | `ceph auth get client.mirror_remote` روی site-b |
+| daemon بالا نمی‌آید | `ceph orch ps --daemon-type cephfs-mirror` و `cephadm logs --name <نام-daemon>` روی مبدأ |
+| import خطا می‌دهد | نام filesystem، اعتبار token، دسترسی شبکه به Monitorهای مقصد و ساعت دو کلاستر |
+| مسیر به Mirroring اضافه نمی‌شود | مسیر را با `ceph fs subvolume getpath` بگیر؛ مسیر داخلی CephFS را بده، نه `/mnt/...` را |
+| Snapshot منتقل نمی‌شود | در مسیر درست `.snap` ساخته شده؟ مسیر با `snapshot mirror add` اضافه شده؟ `ceph fs snapshot mirror status cephfs` چه می‌گوید؟ |
+| authentication error | `ceph auth get client.mirror_remote` روی مقصد و caps آن را بررسی کن |
+| فایل در مقصد دیده نمی‌شود | ابتدا داخل `.snap/<snapshot-name>/` بررسی کن؛ Mirroring Snapshotمحور است و لزوماً فایل جاری را همان لحظه نشان نمی‌دهد |
 
-## حذف
+## حذف مسیرها و peer
+
+برای توقف Mirror کردن هر Subvolume، روی مبدأ مسیر مربوط را جداگانه حذف کن:
 
 ```bash
-ceph fs snapshot mirror remove cephfs /data
+ceph fs snapshot mirror remove cephfs \
+  /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+
+ceph fs snapshot mirror remove cephfs \
+  /volumes/db/db1/aaa2ebad-1407-4922-98f1-668559eefdea
+```
+
+برای حذف peer (فقط پس از حذف مسیرهای Mirror شده و اطمینان از عدم نیاز):
+
+```bash
 ceph fs snapshot mirror peer_list cephfs
-ceph fs snapshot mirror peer_remove cephfs <uuid>
+ceph fs snapshot mirror peer_remove cephfs <peer-uuid>
+```
+
+برای غیرفعال‌کردن Mirroring روی filesystem:
+
+```bash
 ceph fs snapshot mirror disable cephfs
 ```
 
-## نکات
+## نکات مهم
 
-- روی دایرکتوری‌هایی که mirror می‌شوند در site-b ننویس؛ در sync بعدی بازنویسی می‌شود.
-- این mirroring یک‌طرفه است و failover/failback را باید دستی انجام بدهی.
-- mirroring فقط snapshot ها را منتقل می‌کند؛ تغییرات بین دو snapshot تا snapshot بعدی روی site-b دیده نمی‌شود (RPO برابر فاصله snapshot ها به‌علاوه زمان sync است).
+- روی مقصد در مسیرهایی که Mirror می‌شوند به‌صورت مستقل داده ننویس؛ مبدأ مرجع داده است.
+- این Mirroring یک‌طرفه است؛ failover و failback را باید با برنامه‌ریزی و به‌صورت دستی انجام بدهی.
+- فقط Snapshotها منتقل می‌شوند؛ فاصله Snapshotها و مدت زمان Sync، RPO را تعیین می‌کند.
+- کاربرهای برنامه و دیتابیس (`client.app1` و `client.db1`) برای Mount مستقل باقی می‌مانند. کاربر `client.mirror_remote` فقط برای ارتباط Mirroring بین دو کلاستر است.
