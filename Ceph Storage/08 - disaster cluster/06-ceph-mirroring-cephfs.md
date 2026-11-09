@@ -156,27 +156,44 @@ ceph auth get client.app1
 
 ## ۶. آماده‌سازی کلاینت
 
-روی نود ادمین، فایل کانفیگ مینیمال و کلید را بگیر:
+روی نود ادمین، فایل کانفیگ و فایل‌های احراز هویت را بساز:
 
 ```bash
 ceph config generate-minimal-conf > /tmp/ceph.conf
+
+# برای Kernel mount:
 ceph auth get-key client.app1 > /tmp/app1.secret
+
+# برای Ceph-FUSE:
+ceph auth get client.app1 -o /tmp/ceph.client.app1.keyring
 ```
 
-این دو فایل را به سرور کلاینت ببر (مثلاً با `scp`) و روی کلاینت:
+فایل‌های لازم را به سرور کلاینت منتقل کن (مثلاً با `scp`). روی کلاینت:
 
 ```bash
 apt install -y ceph-common
 mkdir -p /etc/ceph
-mv /tmp/ceph.conf /etc/ceph/ceph.conf
-mv /tmp/app1.secret /etc/ceph/app1.secret
-chmod 600 /etc/ceph/app1.secret
+
+# فایل‌ها را در این مسیر قرار بده:
+# /etc/ceph/ceph.conf
+# /etc/ceph/app1.secret
+# /etc/ceph/ceph.client.app1.keyring
+
+chmod 600 /etc/ceph/app1.secret /etc/ceph/ceph.client.app1.keyring
 ```
 
-- کلاینت باید به mon ها (پورت‌های 3300 و 6789)، به OSD ها (6800 تا 7568) و به MDS ها دسترسی شبکه داشته باشد.
-- فایل `app1.secret` فقط خود کلید است، نه کل keyring.
+- کلاینت باید به MONها (پورت‌های 3300 و 6789)، OSDها (معمولاً پورت‌های 6800 تا 7568) و MDSها دسترسی شبکه داشته باشد.
+- `app1.secret` فقط مقدار کلید است؛ keyring علاوه بر کلید، نام کاربر و اطلاعات احراز هویت را هم دارد.
+- برای Ceph-FUSE از keyring استفاده کن؛ `secretfile` مخصوص روش Kernel mount است.
 
 ## ۷. Mount
+
+دو روش برای Mount کردن CephFS وجود دارد:
+
+- **Kernel client (`mount -t ceph`)**: معمولاً کارایی بالاتری دارد.
+- **Ceph-FUSE (`ceph-fuse`)**: در فضای User-space اجرا می‌شود و جایگزین Kernel client است. اگر Kernel نتواند فرمت کلید CephX را بپذیرد، از این روش استفاده کن.
+
+### روش اول: Kernel mount
 
 روی کلاینت:
 
@@ -185,7 +202,7 @@ mkdir -p /mnt/cephfs
 mount -t ceph app1@.cephfs=/ /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
-ساختار `کاربر@.نام_fs=/مسیر` است (بعد از `@` نقطه می‌آید و fsid خالی می‌ماند؛ mon ها از `ceph.conf` خوانده می‌شوند). اگر نسخه kernel یا mount.ceph قدیمی است و این سینتکس را نمی‌شناسد، سینتکس قدیمی:
+ساختار `کاربر@.نام_fs=/مسیر` است (بعد از `@` نقطه می‌آید و fsid خالی می‌ماند؛ MONها از `ceph.conf` خوانده می‌شوند). اگر نسخه Kernel یا `mount.ceph` این سینتکس را پشتیبانی نمی‌کند، سینتکس قدیمی را امتحان کن:
 
 ```bash
 mount -t ceph <IP-mon>:6789:/ /mnt/cephfs -o name=app1,secretfile=/etc/ceph/app1.secret,fs=cephfs
@@ -194,53 +211,132 @@ mount -t ceph <IP-mon>:6789:/ /mnt/cephfs -o name=app1,secretfile=/etc/ceph/app1
 بررسی:
 
 ```bash
-df -h /mnt/cephfs
+df -hT /mnt/cephfs
 mount | grep ceph
 ```
 
-### دایرکتوری `/data` را اگر هنوز نیست بساز
+### Mount کردن فقط یک مسیر یا Subvolume
 
-اگر کاربر محدود به `/data` است و این دایرکتوری وجود ندارد، با یک mount ادمین (روی نود ادمین) بساز:
-
-```bash
-mkdir -p /mnt/admin-cephfs
-mount -t ceph :/ /mnt/admin-cephfs -o name=admin,fs=cephfs
-mkdir -p /mnt/admin-cephfs/data
-umount /mnt/admin-cephfs
-```
-
-سپس کلاینت را روی مسیر محدود mount کن:
+اگر کاربر فقط به `/data` دسترسی دارد، همان مسیر را به‌عنوان ریشه Mount کن:
 
 ```bash
+mkdir -p /mnt/cephfs
 mount -t ceph app1@.cephfs=/data /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
-### تست
+اگر از Subvolume استفاده می‌کنی، به‌جای `/data` مسیر کامل آن را قرار بده؛ مسیر را با این دستور به دست بیاور:
 
 ```bash
-echo "hello" > /mnt/cephfs/test.txt
-cat /mnt/cephfs/test.txt
+ceph fs subvolume getpath cephfs vol1 --group_name mygroup
 ```
 
-### Mount دائمی (fstab)
+اگر دایرکتوری مجازشده هنوز وجود ندارد، آن را با یک Mount ادمین بساز؛ سپس کلاینت محدودشده را Mount کن.
+
+### روش دوم: Ceph-FUSE (جایگزین Kernel mount)
+
+اگر Kernel هنگام Mount خطایی مانند `secret too big 32` می‌دهد، فعلاً به‌جای تغییر Caps یا ساخت مجدد کاربر، از Ceph-FUSE استفاده کن. این خطا یعنی Kernel نتوانسته Secret را در قالب مورد انتظار خودش وارد کند؛ Ceph-FUSE احراز هویت را در User-space انجام می‌دهد.
+
+نصب:
+
+```bash
+apt install -y ceph-fuse
+```
+
+Mount کل filesystem:
+
+```bash
+mkdir -p /mnt/cephfs
+ceph-fuse \
+  -n client.app1 \
+  -k /etc/ceph/ceph.client.app1.keyring \
+  -m <IP-mon>:6789 \
+  --client_fs cephfs \
+  /mnt/cephfs
+```
+
+Mount مستقیم یک مسیر محدود یا Subvolume:
+
+```bash
+mkdir -p /mnt/cephfs
+ceph-fuse \
+  -n client.app1 \
+  -k /etc/ceph/ceph.client.app1.keyring \
+  -m <IP-mon>:6789 \
+  --client_fs cephfs \
+  -r /data \
+  /mnt/cephfs
+```
+
+`-r` مسیر داخل CephFS را به‌عنوان ریشه Mount انتخاب می‌کند. برای Subvolume، مسیر کامل خروجی `ceph fs subvolume getpath` را به‌جای `/data` قرار بده. گزینه `-m` اختیاری است اگر MONها در `/etc/ceph/ceph.conf` تعریف شده باشند.
+
+**نمونه مطابق آزمایش فعلی:**
+
+کاربر `client.app1` در این آزمایش به مسیر زیر محدود شده است:
+
+`/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd`
+
+پس روی `node2`، بعد از قرار دادن keyring در مسیر گفته‌شده:
+
+```bash
+apt install -y ceph-fuse
+
+mkdir -p /mnt/cephfs/app/app1
+
+ceph-fuse \
+  -n client.app1 \
+  -k /root/ceph.client.app1.keyring \
+  -m 192.168.57.25:6789 \
+  --client_fs cephfs \
+  -r /volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd \
+  /mnt/cephfs/app/app1
+```
+
+Keyring را روی node2 از نود ادمین منتقل کن یا همان‌جا با دسترسی مناسب بساز:
+
+```bash
+ceph auth get client.app1 -o /root/ceph.client.app1.keyring
+chmod 600 /root/ceph.client.app1.keyring
+```
+
+تست و بررسی:
+
+```bash
+df -hT /mnt/cephfs/app/app1
+mount | grep ceph
+touch /mnt/cephfs/app/app1/test.txt
+ls -l /mnt/cephfs/app/app1/
+```
+
+Unmount:
+
+```bash
+umount /mnt/cephfs/app/app1
+```
+
+### Mount دائمی
+
+برای Kernel mount می‌توانی از `/etc/fstab` استفاده کنی:
 
 ```bash
 echo 'app1@.cephfs=/data  /mnt/cephfs  ceph  secretfile=/etc/ceph/app1.secret,_netdev,noatime  0 0' >> /etc/fstab
 mount -a
 ```
 
-`_netdev` مهم است تا mount بعد از بالا آمدن شبکه انجام شود.
+برای Ceph-FUSE، ورودی fstab به این شکل است:
 
-### جایگزین: ceph-fuse
-
-اگر kernel client قابل استفاده نیست:
-
-```bash
-apt install -y ceph-fuse
-ceph-fuse -n client.app1 --client_fs cephfs /mnt/cephfs
+```fstab
+none  /mnt/cephfs  fuse.ceph  ceph.id=app1,ceph.conf=/etc/ceph/ceph.conf,ceph.client_fs=cephfs,ceph.client_mountpoint=/data,_netdev,defaults  0  0
 ```
 
-(این روش به keyring در `/etc/ceph/ceph.client.app1.keyring` نیاز دارد: `ceph auth get client.app1 > /etc/ceph/ceph.client.app1.keyring`.)
+در گزینه `ceph.id` فقط شناسه `app1` را بنویس، نه `client.app1`. برای Mount کردن Subvolume، مقدار `ceph.client_mountpoint` را با مسیر کامل Subvolume جایگزین کن. بعد از افزودن ورودی، اجرا کن:
+
+```bash
+mount -a
+```
+
+`_netdev` مهم است تا Mount بعد از آماده‌شدن شبکه انجام شود.
+
+نکته: Ceph-FUSE معمولاً نسبت به Kernel client کارایی پایین‌تری دارد، اما در این سناریو راه جایگزین مناسبی برای عبور از خطای پردازش Secret در Kernel است.
 
 ## ۸. Quota
 
