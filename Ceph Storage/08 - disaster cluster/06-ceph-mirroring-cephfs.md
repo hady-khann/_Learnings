@@ -224,11 +224,30 @@ mkdir -p /mnt/cephfs
 mount -t ceph app1@.cephfs=/data /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
-اگر از Subvolume استفاده می‌کنی، به‌جای `/data` مسیر کامل آن را قرار بده؛ مسیر را با این دستور به دست بیاور:
+اگر از Subvolume استفاده می‌کنی، به‌جای `/data` مسیر کامل آن را قرار بده. مسیر را با دستور زیر روی نود ادمین Ceph به دست بیاور:
 
 ```bash
-ceph fs subvolume getpath cephfs vol1 --group_name mygroup
+ceph fs subvolume getpath <اسم-filesystem> <اسم-subvolume> --group_name <اسم-subvolume-group>
 ```
+
+مثلاً در آزمایش فعلی ما:
+
+```bash
+ceph fs subvolume getpath cephfs app1 --group_name app
+```
+
+خروجی، مسیر کامل Subvolume را برمی‌گرداند؛ برای مثال:
+
+```text
+/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd
+```
+
+معنی پارامترها:
+- `cephfs`: نام CephFS
+- `app1`: نام Subvolume
+- `app`: نام Subvolume Group
+
+این دستور را با دسترسی مدیریتی روی کلاستر اجرا کن؛ سپس مسیر خروجی را در گزینه `-r` دستور `ceph-fuse` یا مسیر Mount در دستور Kernel قرار بده.
 
 اگر دایرکتوری مجازشده هنوز وجود ندارد، آن را با یک Mount ادمین بساز؛ سپس کلاینت محدودشده را Mount کن.
 
@@ -271,11 +290,17 @@ ceph-fuse \
 
 **نمونه مطابق آزمایش فعلی:**
 
-کاربر `client.app1` در این آزمایش به مسیر زیر محدود شده است:
+ابتدا روی نود ادمین مسیر Subvolume را بگیر:
+
+```bash
+ceph fs subvolume getpath cephfs app1 --group_name app
+```
+
+خروجی این دستور را در گزینه `-r` قرار بده. در حال حاضر خروجی Subvolume ما این است:
 
 `/volumes/app/app1/30014e96-1757-480d-ae5b-997477fcfabd`
 
-پس روی `node2`، بعد از قرار دادن keyring در مسیر گفته‌شده:
+کاربر `client.app1` به همین مسیر محدود شده است. پس روی `node2`، بعد از قرار دادن keyring در مسیر گفته‌شده:
 
 ```bash
 apt install -y ceph-fuse
