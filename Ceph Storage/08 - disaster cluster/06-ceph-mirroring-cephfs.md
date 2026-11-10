@@ -75,8 +75,11 @@
 روی نود ادمین:
 
 ```bash
+# وضعیت کلی کلاستر را نشان می‌دهد؛ بعداً قبل از mirror هم باید HEALTH_OK باشد
 ceph -s
+# درخت نودها و OSDها را نشان می‌دهد؛ برای اطمینان از up و in بودن OSDها
 ceph osd tree
+# دیسک‌های آزاد نودها را لیست می‌کند؛ برای اطمینان از وجود دیسک کافی برای OSD
 ceph orch device ls
 ```
 
@@ -85,15 +88,20 @@ ceph orch device ls
 - pool های پیش‌فرض replica با `size=3` هستند؛ با کمتر از ۳ OSD مؤثر، کلاستر **degraded / undersized** می‌ماند و می‌تواند sync را مختل کند. در لب با ۴ OSD یا کمتر موقتاً:
 
 ```bash
+# تعداد replica متادیتا pool را ۲ می‌کند (فقط لب)؛ تا با OSD کم، PG ها undersized نمانند و mirror مختل نشود
 ceph osd pool set cephfs.cephfs.meta size 2
+# تعداد replica data pool را ۲ می‌کند (فقط لب)؛ دلیلش مثل خط قبل
 ceph osd pool set cephfs.cephfs.data size 2
+# حداقل replica لازم برای I/O متادیتا pool را ۱ می‌کند (فقط لب)؛ برای ادامهٔ کار هنگام degraded بودن
 ceph osd pool set cephfs.cephfs.meta min_size 1
+# حداقل replica لازم برای I/O data pool را ۱ می‌کند (فقط لب)؛ دلیلش مثل خط قبل
 ceph osd pool set cephfs.cephfs.data min_size 1
 ```
 
 - روی نود ادمین `ceph-common` نصب باشد:
 
 ```bash
+# ابزارهای ceph را روی نود نصب می‌کند؛ بعداً برای اجرای دستورات ceph و ceph-fuse لازم است
 cephadm install ceph-common
 ```
 
@@ -102,6 +110,7 @@ cephadm install ceph-common
 ## ۳. ساخت filesystem
 
 ```bash
+# filesystem با نام cephfs و دو MDS با pool های خودکار می‌سازد؛ بعداً روی آن mirror می‌زنیم
 ceph fs volume create cephfs --placement="2"
 ```
 
@@ -112,9 +121,13 @@ ceph fs volume create cephfs --placement="2"
 ### روش دستی
 
 ```bash
+# pool متادیتا را می‌سازد (روش دستی)؛ بعداً به ceph fs new داده می‌شود
 ceph osd pool create cephfs_metadata
+# pool داده را می‌سازد (روش دستی)؛ بعداً به ceph fs new داده می‌شود
 ceph osd pool create cephfs_data
+# filesystem را از دو pool بالا می‌سازد (روش دستی)
 ceph fs new cephfs cephfs_metadata cephfs_data
+# دو MDS برای filesystem اجرا می‌کند (روش دستی)؛ یکی active و یکی standby
 ceph orch apply mds cephfs --placement="2"
 ```
 
@@ -123,15 +136,22 @@ ceph orch apply mds cephfs --placement="2"
 ## ۴. بررسی
 
 ```bash
+# لیست filesystemها را نشان می‌دهد؛ بعداً برای چک کردن اسم FS و گرفتن fscid هم استفاده می‌شود
 ceph fs ls
+# وضعیت MDSها و poolهای cephfs را نشان می‌دهد؛ برای اطمینان از active بودن MDS
 ceph fs status cephfs
+# daemonهای MDS را در cephadm لیست می‌کند؛ برای اطمینان از running بودن
 ceph orch ps --daemon-type mds
+# خلاصهٔ وضعیت MDS را چاپ می‌کند؛ برای چک سریع active و standby
 ceph mds stat
 ```
 
 ```bash
+# تعداد MDS فعال را ۱ می‌کند؛ بقیهٔ MDSها standby می‌مانند
 ceph fs set cephfs max_mds 1
+# standby-replay را روشن می‌کند؛ برای failover سریع‌تر MDS
 ceph fs set cephfs allow_standby_replay true
+# اجازهٔ ساخت snapshot در FS را می‌دهد؛ بدون آن mirroring و snapshot کار نمی‌کند
 ceph fs set cephfs allow_new_snaps true
 ```
 
@@ -140,15 +160,19 @@ ceph fs set cephfs allow_new_snaps true
 ## ۵. ساخت کاربر cephx برای کلاینت
 
 ```bash
+# کاربر cephx با دسترسی rw به کل FS می‌سازد؛ برای mount ادمینی داده
 ceph fs authorize cephfs client.adminfs / rw
 # یا مسیر محدود:
+# کاربر cephx با دسترسی rws فقط روی مسیر /data می‌سازد؛ s اجازهٔ snapshot است
 ceph fs authorize cephfs client.app1 /data rws
 ```
 
 برای Subvolume:
 
 ```bash
+# مسیر داده (UUID) subvolume را نشان می‌دهد؛ بعداً برای ساخت caps کاربر و mount لازم است
 ceph fs subvolume getpath cephfs app1 --group_name app
+# کاربر cephx را محدود به مسیر داده subvolume می‌کند؛ اپ فقط همین مسیر را می‌بیند
 ceph fs authorize cephfs client.app1 /volumes/app/app1/<UUID> rws
 ```
 
@@ -157,11 +181,16 @@ ceph fs authorize cephfs client.app1 /volumes/app/app1/<UUID> rws
 ## ۶. فایل‌های احراز هویت
 
 ```bash
+# فایل ceph.conf حداقلی می‌سازد؛ بعداً کلاینت برای اتصال به mon ها لازم دارد
 ceph config generate-minimal-conf > /tmp/ceph.conf
+# secret کاربر app1 را در فایل می‌ریزد؛ بعداً برای mount کرنل لازم است
 ceph auth get-key client.app1 > /tmp/app1.secret
+# دسترسی فایل secret را فقط برای root می‌کند؛ برای امنیت
 chmod 600 /tmp/app1.secret
 
+# keyring کاربر app1 را ذخیره می‌کند؛ بعداً برای ceph-fuse لازم است
 ceph auth get client.app1 -o /tmp/ceph.client.app1.keyring
+# دسترسی keyring را فقط برای root می‌کند؛ برای امنیت
 chmod 600 /tmp/ceph.client.app1.keyring
 ```
 
@@ -172,7 +201,9 @@ chmod 600 /tmp/ceph.client.app1.keyring
 ### Kernel (گاهی در محیط cephadm با خطای secret fail می‌شود)
 
 ```bash
+# دایرکتوری mount را می‌سازد؛ بعداً FS اینجا mount می‌شود
 mkdir -p /mnt/cephfs
+# FS را با kernel client mount می‌کند؛ اگر خطای secret داد از ceph-fuse استفاده کن
 mount -t ceph app1@.cephfs=/ /mnt/cephfs -o secretfile=/etc/ceph/app1.secret
 ```
 
@@ -187,8 +218,11 @@ adding ceph secret key to kernel failed: Invalid argument
 ### Ceph-FUSE (پیشنهادی در تست / وقتی kernel مشکل دارد)
 
 ```bash
+# ceph-fuse را نصب می‌کند؛ بعداً برای mount در cephadm و mount ادمین مبدأ و مقصد لازم است
 apt install -y ceph-fuse
+# دایرکتوری mount را می‌سازد؛ بعداً FS اینجا mount می‌شود
 mkdir -p /mnt/cephfs
+# FS را با ceph-fuse و کاربر app1 mount می‌کند؛ جایگزین kernel mount
 ceph-fuse -n client.app1 -k /etc/ceph/ceph.client.app1.keyring \
   --client_fs cephfs /mnt/cephfs
 ```
@@ -196,6 +230,7 @@ ceph-fuse -n client.app1 -k /etc/ceph/ceph.client.app1.keyring \
 با root محدود (`-r`):
 
 ```bash
+# فقط یک مسیر مشخص (مثلاً subvolume) را با ceph-fuse mount می‌کند؛ برای اپ محدود به داده خودش
 ceph-fuse -n client.app1 -k /path/to/keyring --client_fs cephfs \
   -r /volumes/app/app1/<UUID> /mnt/cephfs/app/app1 -o allow_other
 ```
@@ -205,8 +240,11 @@ ceph-fuse -n client.app1 -k /path/to/keyring --client_fs cephfs \
 ## ۸. Quota
 
 ```bash
+# ابزار setfattr را نصب می‌کند؛ بعداً برای quota لازم است
 apt install -y attr
+# سقف حجم دایرکتوری را ۱۰۰ گیگ می‌کند؛ برای کنترل مصرف
 setfattr -n ceph.quota.max_bytes -v 107374182400 /mnt/cephfs/data
+# سقف تعداد فایل دایرکتوری را یک میلیون می‌کند؛ برای کنترل مصرف
 setfattr -n ceph.quota.max_files -v 1000000 /mnt/cephfs/data
 ```
 
@@ -224,16 +262,22 @@ Subvolume برای ایزوله‌سازی و quota خوب است و با mirror
 ```
 
 ```bash
+# subvolumegroup می‌سازد؛ بعداً subvolumeها داخل آن قرار می‌گیرند
 ceph fs subvolumegroup create cephfs app
+# subvolume با سقف ۱۰ گیگ می‌سازد؛ بعداً ریشهٔ آن را mirror می‌کنیم
 ceph fs subvolume create cephfs app1 --group_name app --size 10737418240
+# مسیر داده subvolume را می‌دهد؛ ریشهٔ mirror یک سطح بالاتر از UUID است
 ceph fs subvolume getpath cephfs app1 --group_name app     # → /volumes/app/app1/<UUID>  (مسیر داده)
+# مشخصات subvolume (مسیر، quota، features) را نشان می‌دهد؛ برای چک نسخه v2 و مسیر
 ceph fs subvolume info cephfs app1 --group_name app
 ```
 
 ساخت snapshot (محلی / CSI / **و قابل mirror**، وقتی ریشهٔ subvolume mirror شده باشد):
 
 ```bash
+# snapshot subvolume را روی ریشهٔ آن می‌سازد؛ همین snapshot بعداً توسط mirror منتقل می‌شود
 ceph fs subvolume snapshot create cephfs app1 snap1 --group_name app
+# snapshotهای subvolume را لیست می‌کند؛ برای اطمینان از ساخته شدن
 ceph fs subvolume snapshot ls cephfs app1 --group_name app
 ```
 
@@ -244,12 +288,18 @@ ceph fs subvolume snapshot ls cephfs app1 --group_name app
 ## ۱۰. Snapshot روی دایرکتوری معمولی (روش سازگار با Mirroring)
 
 ```bash
+# اجازهٔ ساخت snapshot در FS را می‌دهد؛ بدون آن mkdir .snap کار نمی‌کند
 ceph fs set cephfs allow_new_snaps true
+# دایرکتوری معمولی تست را می‌سازد؛ بعداً snapshot روی آن گرفته می‌شود
 mkdir -p /mnt/cephfs-source/data
+# FS را mount می‌کند (جای ... را با روش mount خودت پر کن)؛ برای دسترسی به .snap
 mount ...   # یا ceph-fuse با admin
 
+# با mkdir داخل .snap یک snapshot می‌سازد؛ همین روش برای mirror استفاده می‌شود
 mkdir /mnt/cephfs-source/data/.snap/snap-test
+# snapshotهای موجود را لیست می‌کند؛ برای اطمینان از ساخته شدن
 ls /mnt/cephfs-source/data/.snap/
+# snapshot تست را حذف می‌کند؛ برای تمیزکاری
 rmdir /mnt/cephfs-source/data/.snap/snap-test
 ```
 
@@ -313,10 +363,15 @@ rmdir /mnt/cephfs-source/data/.snap/snap-test
 ## مرحله ۰: آماده‌سازی (هر دو کلاستر)
 
 ```bash
+# ابزارهای ceph را نصب می‌کند؛ روی هر دو کلاستر برای اجرای دستورات بعدی لازم است
 cephadm install ceph-common
+# jq و attr و ceph-fuse را نصب می‌کند؛ jq برای خواندن token و ceph-fuse برای بررسی داده لازم است
 apt install -y jq attr ceph-fuse
+# سلامت کلاستر را چک می‌کند؛ قبل از mirror باید HEALTH_OK باشد
 ceph -s
+# fsid کلاستر را نشان می‌دهد؛ برای اطمینان از اینکه دو کلاستر متفاوت‌اند
 ceph fsid
+# نام FS را چک می‌کند؛ باید در هر دو کلاستر یکسان باشد (cephfs)
 ceph fs ls
 ```
 
@@ -329,8 +384,11 @@ ceph fs ls
 ## مرحله ۱: فعال‌سازی ماژول و daemon (مبدأ)
 
 ```bash
+# ماژول mirroring را در mgr فعال می‌کند؛ دستورات ceph fs snapshot mirror بدون آن کار نمی‌کنند
 ceph mgr module enable mirroring
+# daemon cephfs-mirror را با cephadm اجرا می‌کند؛ این daemon snapshotها را به مقصد می‌فرستد
 ceph orch apply cephfs-mirror
+# وضعیت daemon را نشان می‌دهد؛ صبر کن تا running شود
 ceph orch ps --daemon-type cephfs-mirror
 ```
 
@@ -339,6 +397,7 @@ ceph orch ps --daemon-type cephfs-mirror
 روی **هر دو** کلاستر (در صورت نیاز ماژول):
 
 ```bash
+# ماژول mirroring را فعال می‌کند (فقط در صورت نیاز)؛ مثل مرحلهٔ ۱
 ceph mgr module enable mirroring
 ```
 
@@ -347,6 +406,7 @@ ceph mgr module enable mirroring
 ## مرحله ۲: فعال‌سازی mirroring روی FS (مبدأ)
 
 ```bash
+# mirroring را برای FS روشن می‌کند؛ قبل از add کردن peer و مسیر لازم است
 ceph fs snapshot mirror enable cephfs
 ```
 
@@ -355,17 +415,23 @@ ceph fs snapshot mirror enable cephfs
 ## مرحله ۳: کاربر و token روی مقصد (site-b)
 
 ```bash
+# روی مقصد کاربر mirror_remote با دسترسی rwps می‌سازد؛ مبدأ با این کاربر در مقصد snapshot می‌سازد
 ceph fs authorize cephfs client.mirror_remote / rwps
+# caps کاربر را نشان می‌دهد؛ برای اطمینان از rwps
 ceph auth get client.mirror_remote
 
+# روی مقصد token اتصال می‌سازد؛ بعداً در مبدأ import می‌شود
 ceph fs snapshot mirror peer_bootstrap create cephfs client.mirror_remote site-b > /root/cephfs-token.json
+# دسترسی فایل token را فقط برای root می‌کند؛ چون شامل کلید است
 chmod 600 /root/cephfs-token.json
+# محتوای token را خوانا چاپ می‌کند؛ برای اطمینان از سالم بودن فایل
 jq . /root/cephfs-token.json
 ```
 
 انتقال به مبدأ:
 
 ```bash
+# token را به مبدأ می‌فرستد؛ بعداً در مرحلهٔ import لازم است
 scp /root/cephfs-token.json root@<IP-site-a>:/root/cephfs-token.json
 ```
 
@@ -374,11 +440,16 @@ scp /root/cephfs-token.json root@<IP-site-a>:/root/cephfs-token.json
 ## مرحله ۴: Import peer (مبدأ)
 
 ```bash
+# دسترسی token را در مبدأ هم محدود می‌کند؛ برای امنیت
 chmod 600 /root/cephfs-token.json
+# فقط مقدار token را در متغیر می‌گذارد؛ بعداً به import داده می‌شود
 TOKEN=$(jq -r .token /root/cephfs-token.json)
+# token را import می‌کند و مقصد را به‌عنوان peer ثبت می‌کند؛ از این به بعد mirror می‌تواند به مقصد وصل شود
 ceph fs snapshot mirror peer_bootstrap import cephfs "$TOKEN"
+# متغیر token را پاک می‌کند؛ برای امنیت
 unset TOKEN
 
+# peerها را لیست می‌کند؛ باید site-b دیده شود و UUID آن بعداً برای status لازم است
 ceph fs snapshot mirror peer_list cephfs
 ```
 
@@ -392,19 +463,27 @@ ceph fs snapshot mirror peer_list cephfs
 
 ```bash
 # نام group و subvolume را عوض کن
+# نام FS را در متغیر می‌گذارد؛ در دستورات بعدی استفاده می‌شود
 FS=cephfs
+# نام subvolumegroup را در متغیر می‌گذارد؛ در دستورات بعدی استفاده می‌شود
 GROUP=app
+# نام subvolume را در متغیر می‌گذارد؛ در دستورات بعدی استفاده می‌شود
 SUBVOL=app1
 
 # بررسی: مسیر داده (فقط برای اطلاع) و ریشهٔ subvolume
+# مسیر داده (با UUID) را نشان می‌دهد؛ فقط برای اطلاع، این را mirror نکن
 ceph fs subvolume getpath $FS $SUBVOL --group_name $GROUP
 # خروجی: /volumes/app/app1/<UUID>   ← این را mirror نکن
 
 # مسیر صحیح mirror = ریشهٔ subvolume = دو سطح بالاتر از UUID
+# ریشهٔ subvolume را از مسیر UUID بیرون می‌کشد؛ همان مسیر درست mirror است
 SV_ROOT=$(dirname "$(ceph fs subvolume getpath $FS $SUBVOL --group_name $GROUP)")
+# مسیر محاسبه‌شده را چاپ می‌کند؛ برای اطمینان از درست بودن (/volumes/group/subvol)
 echo "$SV_ROOT"            # /volumes/app/app1
 
+# ریشهٔ subvolume را برای mirror ثبت می‌کند؛ از این به بعد snapshotهایش به مقصد می‌رود
 ceph fs snapshot mirror add $FS "$SV_ROOT"
+# مسیرهای ثبت‌شده برای mirror را لیست می‌کند؛ برای تأیید
 ceph fs snapshot mirror ls $FS
 ```
 
@@ -413,11 +492,13 @@ ceph fs snapshot mirror ls $FS
 برای چند subvolume، همین کار را برای هرکدام تکرار کن:
 
 ```bash
+# حلقه برای چند subvolume؛ مسیر ریشهٔ هرکدام را محاسبه و add می‌کند (فرمت group:subvol)
 for SV in "app:app1" "db:db1"; do
   G=${SV%%:*}; N=${SV##*:}
   ROOT=$(dirname "$(ceph fs subvolume getpath cephfs $N --group_name $G)")
   ceph fs snapshot mirror add cephfs "$ROOT"
 done
+# مسیرهای ثبت‌شده را لیست می‌کند؛ برای تأیید همهٔ subvolumeها
 ceph fs snapshot mirror ls cephfs
 ```
 
@@ -427,15 +508,23 @@ ceph fs snapshot mirror ls cephfs
 
 ```bash
 # روی مبدأ – mount ادمین با FUSE
+# دایرکتوری mount مبدأ را می‌سازد؛ بعداً FS اینجا mount می‌شود
 mkdir -p /mnt/cephfs-source
+# FS را با کاربر admin mount می‌کند؛ برای ساخت دایرکتوری و snapshot روی مبدأ
 ceph-fuse /mnt/cephfs-source -n client.admin --client_fs cephfs -o allow_other
 
+# دو دایرکتوری معمولی می‌سازد؛ بعداً mirror می‌شوند
 mkdir -p /mnt/cephfs-source/app1-data /mnt/cephfs-source/db1-data
+# فایل تست داخل app1-data می‌نویسد؛ بعداً در مقصد دنبالش می‌گردیم
 echo "app data" > /mnt/cephfs-source/app1-data/file.txt
+# فایل تست داخل db1-data می‌نویسد؛ بعداً در مقصد دنبالش می‌گردیم
 echo "db data"  > /mnt/cephfs-source/db1-data/file.txt
 
+# app1-data را برای mirror ثبت می‌کند
 ceph fs snapshot mirror add cephfs /app1-data
+# db1-data را برای mirror ثبت می‌کند
 ceph fs snapshot mirror add cephfs /db1-data
+# مسیرهای ثبت‌شده را لیست می‌کند؛ برای تأیید
 ceph fs snapshot mirror ls cephfs
 ```
 
@@ -446,14 +535,18 @@ ceph fs snapshot mirror ls cephfs
 Mirror فقط snapshotهای **با نام معمولی** (بدون پیشوند `_`) را منتقل می‌کند. نام snapshot باید در مقصد یکتا باشد؛ نام ثابت و تکراری استفاده نکن (مثلاً با تاریخ بساز).
 
 ```bash
+# اجازهٔ ساخت snapshot را تضمین می‌کند؛ بدون آن snapshot ساخته نمی‌شود
 ceph fs set cephfs allow_new_snaps true
 ```
 
 ### الف) Subvolume: روش A، با API (توصیه‌شده برای دستی و اسکریپت)
 
 ```bash
+# نام snapshot یکتا با تاریخ می‌سازد؛ چون نام در مقصد باید تکراری نباشد
 SNAP=snap-$(date +%Y%m%d-%H%M%S)
+# snapshot subvolume را می‌سازد؛ mirror آن را در چرخهٔ بعدی منتقل می‌کند
 ceph fs subvolume snapshot create cephfs app1 $SNAP --group_name app
+# snapshotها را لیست می‌کند؛ برای اطمینان از ساخته شدن
 ceph fs subvolume snapshot ls cephfs app1 --group_name app
 ```
 
@@ -461,7 +554,9 @@ ceph fs subvolume snapshot ls cephfs app1 --group_name app
 
 ```bash
 # mount ادمین از ریشهٔ FS
+# snapshot را با mkdir روی ریشهٔ subvolume می‌سازد؛ معادل API (روی UUID خطا می‌دهد)
 mkdir /mnt/cephfs-source/volumes/app/app1/.snap/snap-$(date +%Y%m%d-%H%M%S)
+# snapshotهای ریشه را لیست می‌کند؛ برای تأیید
 ls /mnt/cephfs-source/volumes/app/app1/.snap/
 ```
 
@@ -470,9 +565,13 @@ ls /mnt/cephfs-source/volumes/app/app1/.snap/
 ### پ) Subvolume: زمان‌بندی خودکار (توصیه‌شده برای production)
 
 ```bash
+# ماژول زمان‌بندی snapshot را فعال می‌کند؛ بدون آن snap-schedule کار نمی‌کند
 ceph mgr module enable snap_schedule
+# هر ساعت یک snapshot خودکار از subvolume می‌سازد؛ mirror آن‌ها را منتقل می‌کند
 ceph fs snap-schedule add / 1h --fs cephfs --subvol app1 --group app
+# فقط ۲۴ snapshot ساعتی آخر را نگه می‌دارد؛ برای جلوگیری از انباشت
 ceph fs snap-schedule retention add / h 24 --fs cephfs --subvol app1 --group app
+# وضعیت زمان‌بندی را نشان می‌دهد؛ برای اطمینان از فعال بودن
 ceph fs snap-schedule status / --fs cephfs --subvol app1 --group app
 ```
 
@@ -483,11 +582,16 @@ ceph fs snap-schedule status / --fs cephfs --subvol app1 --group app
 ### ت) دایرکتوری معمولی
 
 ```bash
+# snapshot دستی روی دایرکتوری معمولی می‌سازد؛ mirror آن را منتقل می‌کند
 mkdir /mnt/cephfs-source/app1-data/.snap/snap-$(date +%Y%m%d-%H%M%S)
+# snapshotها را لیست می‌کند؛ برای تأیید
 ls /mnt/cephfs-source/app1-data/.snap/
 
+# هر ساعت snapshot خودکار از /app1-data می‌سازد؛ mirror آن‌ها را منتقل می‌کند
 ceph fs snap-schedule add /app1-data 1h
+# فقط ۲۴ snapshot آخر را نگه می‌دارد؛ برای جلوگیری از انباشت
 ceph fs snap-schedule retention add /app1-data h 24
+# وضعیت زمان‌بندی را نشان می‌دهد؛ برای تأیید
 ceph fs snap-schedule status /app1-data
 ```
 
@@ -496,8 +600,11 @@ ceph fs snap-schedule status /app1-data
 Snapshot در CephFS بین چند کلاینتِ همزمان consistency قوی ندارد. برای دیتابیس‌ها یا اپ‌های چندکلاینتی، قبل از snapshot، subvolume را quiesce کن:
 
 ```bash
+# I/O چند subvolume را موقتاً مکث می‌کند؛ تا snapshot بین کلاینت‌ها consistent شود
 ceph fs quiesce cephfs --set-id snapset1 app/app1 --timeout 30 --expiration 30 --await
+# snapshot را در زمان مکث می‌سازد؛ این نقطهٔ consistent است که mirror می‌برد
 ceph fs subvolume snapshot create cephfs app1 snap-$(date +%Y%m%d-%H%M%S) --group_name app
+# مکث I/O را آزاد می‌کند؛ بعد از snapshot حتماً لازم است
 ceph fs quiesce cephfs --set-id snapset1 --release --await
 ```
 
@@ -510,8 +617,11 @@ ceph fs quiesce cephfs --set-id snapset1 --release --await
 ### peer list و daemon
 
 ```bash
+# وضعیت daemon و peerها را نشان می‌دهد؛ برای اطمینان از اتصال به مقصد
 ceph fs snapshot mirror daemon status
+# peerها را لیست می‌کند؛ UUID آن برای دستورات status لازم است
 ceph fs snapshot mirror peer_list cephfs
+# مسیرهای mirror را لیست می‌کند؛ برای تأیید اینکه مسیر درست ثبت شده
 ceph fs snapshot mirror ls cephfs
 ```
 
@@ -520,6 +630,7 @@ ceph fs snapshot mirror ls cephfs
 مسیر asok در cephadm طولانی است و ممکن است خطای `AF_UNIX path too long` بدهد. همیشه symlink کوتاه بساز:
 
 ```bash
+# سوکت admin daemon را پیدا و یک symlink کوتاه می‌سازد؛ چون مسیر اصلی خطای AF_UNIX path too long می‌دهد
 for a in $(find /var/run/ceph -name '*cephfs-mirror*.asok'); do
   if ceph --admin-daemon "$a" help 2>/dev/null | grep -q 'fs mirror peer status'; then
     ln -sf "$a" /tmp/mirror.asok
@@ -529,12 +640,15 @@ for a in $(find /var/run/ceph -name '*cephfs-mirror*.asok'); do
 done
 
 # عدد بعد از @ همان fscid است (در مثال 2). از اینجا بگیر:
+# fscid را نشان می‌دهد؛ عدد بعد از @ در دستورات admin socket است
 ceph fs get cephfs | grep fscid
 
 # وضعیت کلی
+# وضعیت کلی mirror را نشان می‌دهد؛ برای اطمینان از وجود peer و تعداد مسیرها
 ceph --admin-daemon /tmp/mirror.asok fs mirror status cephfs@<FSCID>
 
 # وضعیت هر مسیر (UUID peer را از peer_list بردار)
+# وضعیت sync هر مسیر را نشان می‌دهد؛ state و last_synced_snap و snaps_synced از اینجا خوانده می‌شود
 ceph --admin-daemon /tmp/mirror.asok fs mirror peer status cephfs@<FSCID> <PEER-UUID>
 ```
 
@@ -545,7 +659,9 @@ ceph --admin-daemon /tmp/mirror.asok fs mirror peer status cephfs@<FSCID> <PEER-
 اگر نسخهٔ شما این دستور را دارد (در مستندات `latest` آمده؛ با `ceph fs snapshot mirror -h` چک کن)، از هر نود ادمین کار می‌کند:
 
 ```bash
+# وضعیت sync همهٔ مسیرها را از mgr نشان می‌دهد؛ جایگزین admin socket (اگر نسخه پشتیبانی کند)
 ceph fs snapshot mirror status cephfs
+# وضعیت sync یک مسیر را نشان می‌دهد؛ برای بررسی subvolume مشخص
 ceph fs snapshot mirror status cephfs /volumes/app/app1
 ```
 
@@ -578,10 +694,13 @@ ceph fs snapshot mirror status cephfs /volumes/app/app1
 ### لاگ daemon
 
 ```bash
+# لاگ daemon mirror را می‌خواند؛ برای دیدن خطاهای sync
 cephadm logs --name $(ceph orch ps --daemon-type cephfs-mirror -f json | jq -r '.[0].daemon_name') 2>&1 | tail -100
 
 # افزایش debug در صورت نیاز
+# سطح debug را بالا می‌برد؛ فقط برای عیب‌یابی، بعداً برگردان
 ceph config set client.cephfs-mirror debug_cephfs_mirror 20
+# daemon را restart می‌کند؛ تا debug جدید اعمال شود
 ceph orch daemon restart <cephfs-mirror-daemon-name>
 ```
 
@@ -592,16 +711,23 @@ ceph orch daemon restart <cephfs-mirror-daemon-name>
 ## مرحله ۸: بررسی روی مقصد (site-b)
 
 ```bash
+# دایرکتوری mount مقصد را می‌سازد؛ برای بررسی داده روی مقصد
 mkdir -p /mnt/cephfs-dr
+# FS مقصد را با admin mount می‌کند؛ برای دیدن snapshotهای sync‌شده
 ceph-fuse /mnt/cephfs-dr -n client.admin --client_fs cephfs -o allow_other
 
 # Subvolume (مسیر در مقصد همان مسیر مبدأ است)
+# محتوای مسیر subvolume را در مقصد نشان می‌دهد؛ برای اطمینان از وجود مسیر
 ls -la /mnt/cephfs-dr/volumes/app/app1/
+# snapshotهای sync‌شده در مقصد را لیست می‌کند؛ نام آخرین باید با last_synced_snap یکی باشد
 ls -la /mnt/cephfs-dr/volumes/app/app1/.snap/
+# داده داخل یک snapshot مقصد را نشان می‌دهد؛ برای تأیید محتوا
 ls -la /mnt/cephfs-dr/volumes/app/app1/.snap/<SNAP>/<UUID>/
 
 # دایرکتوری معمولی
+# snapshotهای دایرکتوری معمولی را در مقصد لیست می‌کند
 ls -la /mnt/cephfs-dr/app1-data/.snap/
+# محتوای فایل داخل snapshot مقصد را می‌خواند؛ برای تأیید sync
 cat /mnt/cephfs-dr/app1-data/.snap/<SNAP>/file.txt
 ```
 
@@ -616,28 +742,40 @@ cat /mnt/cephfs-dr/app1-data/.snap/<SNAP>/file.txt
 ### تست Subvolume (روی مبدأ)
 
 ```bash
+# group تست می‌سازد؛ برای تست end-to-end
 ceph fs subvolumegroup create cephfs testgrp
+# subvolume تست می‌سازد؛ برای تست end-to-end
 ceph fs subvolume create cephfs testsv --group_name testgrp --size 1073741824
 
+# مسیر داده را در متغیر می‌گذارد؛ بعداً برای نوشتن فایل و محاسبهٔ ریشه لازم است
 UUID_PATH=$(ceph fs subvolume getpath cephfs testsv --group_name testgrp)
+# ریشهٔ subvolume را محاسبه می‌کند؛ همان مسیر mirror
 SV_ROOT=$(dirname "$UUID_PATH")
+# هر دو مسیر را چاپ می‌کند؛ برای اطمینان از محاسبهٔ درست
 echo "$UUID_PATH  →  $SV_ROOT"
 
 # نوشتن داده داخل مسیر UUID
+# فایل تست داخل مسیر داده می‌نویسد؛ بعداً در مقصد دنبالش می‌گردیم
 echo "SVTEST $(date)" > /mnt/cephfs-source${UUID_PATH}/data.txt
 
 # ساخت snapshot و اضافه کردن مسیر
+# snapshot تست می‌سازد؛ همین snapshot باید به مقصد برسد
 ceph fs subvolume snapshot create cephfs testsv SVTEST1 --group_name testgrp
+# ریشهٔ subvolume تست را برای mirror ثبت می‌کند
 ceph fs snapshot mirror add cephfs "$SV_ROOT"
 
+# چند ثانیه صبر می‌کند؛ تا mirror فرصت sync داشته باشد
 sleep 20
+# وضعیت sync را چک می‌کند؛ باید idle و snaps_synced ≥ 1 باشد
 ceph --admin-daemon /tmp/mirror.asok fs mirror peer status cephfs@<FSCID> <PEER-UUID>
 ```
 
 روی **مقصد**:
 
 ```bash
+# نام پوشهٔ UUID داخل snapshot مقصد را می‌گیرد؛ چون در مقصد UUID همان مبدأ است
 UUID_DIR=$(ls /mnt/cephfs-dr/volumes/testgrp/testsv/.snap/SVTEST1/)
+# فایل تست را از snapshot مقصد می‌خواند؛ دیدن متن یعنی mirror سالم است
 cat /mnt/cephfs-dr/volumes/testgrp/testsv/.snap/SVTEST1/$UUID_DIR/data.txt
 ```
 
@@ -646,17 +784,24 @@ cat /mnt/cephfs-dr/volumes/testgrp/testsv/.snap/SVTEST1/$UUID_DIR/data.txt
 روی **مبدأ**:
 
 ```bash
+# دایرکتوری تست معمولی می‌سازد
 mkdir -p /mnt/cephfs-source/newtest
+# فایل تست می‌نویسد؛ بعداً در مقصد دنبالش می‌گردیم
 echo "NEWTESTSNAP $(date)" > /mnt/cephfs-source/newtest/data.txt
+# snapshot تست می‌سازد؛ همین باید به مقصد برسد
 mkdir /mnt/cephfs-source/newtest/.snap/NEWTESTSNAP
+# دایرکتوری تست را برای mirror ثبت می‌کند
 ceph fs snapshot mirror add cephfs /newtest
+# چند ثانیه صبر می‌کند؛ تا mirror فرصت sync داشته باشد
 sleep 15
+# وضعیت sync را چک می‌کند؛ باید snaps_synced ≥ 1 باشد
 ceph --admin-daemon /tmp/mirror.asok fs mirror peer status cephfs@<FSCID> <PEER-UUID>
 ```
 
 روی **مقصد**:
 
 ```bash
+# فایل تست را از snapshot مقصد می‌خواند؛ دیدن متن یعنی mirror سالم است
 cat /mnt/cephfs-dr/newtest/.snap/NEWTESTSNAP/data.txt
 ```
 
@@ -667,6 +812,7 @@ cat /mnt/cephfs-dr/newtest/.snap/NEWTESTSNAP/data.txt
 ## مرحله ۱۰: پاک‌سازی token و unmount
 
 ```bash
+# فایل token را امن پاک می‌کند؛ چون دیگر بعد از import لازم نیست و کلید دارد
 shred -u /root/cephfs-token.json
 # fusermount3 -u /mnt/cephfs-source
 # fusermount3 -u /mnt/cephfs-dr
@@ -679,8 +825,11 @@ shred -u /root/cephfs-token.json
 در مستندات `latest` آمده؛ با `ceph fs snapshot mirror -h` وجود آن را در نسخهٔ خودت چک کن.
 
 ```bash
+# یک snapshot مهم را checkpoint می‌کند؛ بعداً وضعیت رسیدنش به مقصد را ببینیم
 ceph fs snapshot mirror checkpoint add cephfs /volumes/app/app1 <SNAP>
+# آخرین snapshot را checkpoint می‌کند؛ بدون دانستن نام snapshot
 ceph fs snapshot mirror checkpoint now cephfs /volumes/app/app1
+# وضعیت checkpointها را نشان می‌دهد؛ complete یعنی به مقصد رسیده
 ceph fs snapshot mirror checkpoint ls cephfs /volumes/app/app1 --format json-pretty
 ```
 
@@ -696,16 +845,21 @@ CephFS دستور promote ندارد. Failover کاملاً دستی است: ت�
 
 ```bash
 # ۱) اپ‌ها را متوقف کن؛ در صورت نیاز ورود کلاینت جدید را ببند
+# ورود کلاینت جدید به FS مبدأ را می‌بندد؛ در failover برنامه‌ریزی‌شده برای قطع نوشتن
 ceph fs set cephfs refuse_client_session true
 
 # ۲) snapshot نهایی (برای subvolume)
+# snapshot نهایی می‌سازد؛ نقطهٔ بازیابی که باید به مقصد برسد
 ceph fs subvolume snapshot create cephfs app1 FINAL-$(date +%Y%m%d-%H%M) --group_name app
 
 # ۳) صبر کن تا sync تمام شود و last_synced_snap.name همین snapshot باشد، state: idle
+# وضعیت sync را چک می‌کند؛ باید idle و last_synced_snap همان snapshot نهایی باشد
 ceph fs snapshot mirror status cephfs /volumes/app/app1      # یا admin socket
 
 # ۴) فقط بعد از تأیید، mirror را متوقف کن
+# mirroring را خاموش می‌کند؛ فقط بعد از تأیید sync نهایی
 ceph fs snapshot mirror disable cephfs
+# daemon mirror را متوقف می‌کند؛ تا دیگر چیزی به مقصد ارسال نشود
 ceph orch stop cephfs-mirror
 ```
 
@@ -713,9 +867,11 @@ ceph orch stop cephfs-mirror
 
 ```bash
 # ۵) اگر refuse_client_session ست شده بود
+# محدودیت ورود کلاینت را در مقصد برمی‌دارد؛ تا کلاینت‌ها وصل شوند
 ceph fs set cephfs refuse_client_session false
 
 # ۶) mount مستقیم مسیر داده (بدون وابستگی به subvolume API)
+# مسیر داده را مستقیم در مقصد mount می‌کند؛ بدون نیاز به subvolume API
 ceph-fuse -n client.app1 --client_fs cephfs \
   -r /volumes/app/app1/<UUID> /mnt/app1 -o allow_other
 ```
@@ -728,12 +884,15 @@ ceph-fuse -n client.app1 --client_fs cephfs \
 - اگر هنگام قطع، sync در حال انجام بود (`syncing`) یا مطمئن نیستی، **به محتوای زنده اعتماد نکن** (xattr `ceph.mirror.dirty_snap_id` نشانهٔ sync ناقص است). از یک snapshot سالم در `.snap/` بازیابی کن:
 
 ```bash
+# snapshotهای مقصد را لیست می‌کند؛ برای انتخاب نقطهٔ بازیابی
 ls /mnt/cephfs-dr/volumes/app/app1/.snap/
 
 # بازیابی بخشی
+# فقط فایل یا پوشهٔ مشخصی را از snapshot برمی‌گرداند؛ بازیابی بخشی
 cp -a  <mount>/volumes/app/app1/.snap/<SNAP>/<UUID>/<path>  <mount>/volumes/app/app1/<UUID>/<path>
 
 # بازیابی کامل (مخرب: فایل‌های اضافه در حالت زنده پاک می‌شوند)
+# کل محتوا را از snapshot برمی‌گرداند؛ مخرب است و فایل‌های اضافه را پاک می‌کند
 rsync -a --delete \
   <mount>/volumes/app/app1/.snap/<SNAP>/<UUID>/ \
   <mount>/volumes/app/app1/<UUID>/
@@ -751,24 +910,32 @@ rsync -a --delete \
 ## حذف مسیر / peer
 
 ```bash
+# mirror مسیر subvolume را متوقف می‌کند
 ceph fs snapshot mirror remove cephfs /volumes/app/app1
+# mirror مسیر app1-data را متوقف می‌کند
 ceph fs snapshot mirror remove cephfs /app1-data
+# mirror مسیر newtest را متوقف می‌کند
 ceph fs snapshot mirror remove cephfs /newtest
 
+# peerها را لیست می‌کند؛ UUID برای حذف لازم است
 ceph fs snapshot mirror peer_list cephfs
+# peer را حذف می‌کند؛ ارتباط با مقصد قطع می‌شود
 ceph fs snapshot mirror peer_remove cephfs <peer-uuid>
+# mirroring را برای FS خاموش می‌کند؛ آخرین مرحلهٔ حذف
 ceph fs snapshot mirror disable cephfs
 ```
 
 حذف snapshot روی مسیر معمولی:
 
 ```bash
+# snapshot تست را حذف می‌کند؛ تمیزکاری
 rmdir /mnt/cephfs-source/newtest/.snap/NEWTESTSNAP
 ```
 
 روی Subvolume (API) در **مبدأ**:
 
 ```bash
+# snapshot subvolume را در مبدأ حذف می‌کند؛ در sync بعدی از مقصد هم پاک می‌شود
 ceph fs subvolume snapshot rm cephfs app1 <SNAP> --group_name app --force
 ```
 
